@@ -7,6 +7,7 @@
 #include <byteswap.h>
 #include <infiniband/verbs.h>
 #include <arpa/inet.h>
+#include <rdma/rdma_cma.h>
 
 #define IB_MTU			IBV_MTU_4096
 #define IB_PORT			1

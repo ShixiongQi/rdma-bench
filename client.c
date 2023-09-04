@@ -53,19 +53,23 @@ void *client_thread_func (void *arg)
     check (wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
 
     for (i = 0; i < num_peers; i++) {
-	for (j = 0; j < num_concurr_msgs; j++) {
-	    ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
-	    buf_offset = (buf_offset + msg_size) % buf_size;
-	    buf_ptr = buf_base + buf_offset;
-	}
+        for (j = 0; j < num_concurr_msgs; j++) {
+            ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
+            buf_offset = (buf_offset + msg_size) % buf_size;
+            buf_ptr = buf_base + buf_offset;
+        }
     }
 
+    printf("Client thread-[%ld] wait for start signal...\n", thread_id);
     /* wait for start signal */
     while (start_sending != true) {
+        printf("11111\n");
         do {
+            // printf("33333\n");
             n = ibv_poll_cq (cq, num_wc, wc);
         } while (n < 1);
         check (n > 0, "thread[%ld]: failed to poll cq", thread_id);
+        printf("22222\n");
 
         for (i = 0; i < n; i++) {
             if (wc[i].status != IBV_WC_SUCCESS) {
@@ -77,27 +81,28 @@ void *client_thread_func (void *arg)
                 post_srq_recv (msg_size, lkey, wc[i].wr_id, srq, (char *)wc[i].wr_id);
                 
                 if (ntohl(wc[i].imm_data) == MSG_CTL_START) {
-		    num_acked_peers += 1;
-		    if (num_acked_peers == num_peers) {
-			start_sending = true;
-			break;
-		    }
+                    num_acked_peers += 1;
+                    if (num_acked_peers == num_peers) {
+                        start_sending = true;
+                        break;
+                    }
                 }
             }
         }
     }
+    printf("thread[%ld]: ready to send...\n", thread_id);
     log ("thread[%ld]: ready to send", thread_id);
 
     /* pre-post sends */
     buf_offset = 0;
     debug ("buf_ptr = %"PRIx64"", (uint64_t)buf_ptr);
     for (i = 0; i < num_peers; i++) {
-	for (j = 0; j < num_concurr_msgs; j++) {
-	    ret = post_send (msg_size, lkey, (uint64_t)buf_ptr, (uint32_t)i, qp[i], buf_ptr);
-	    check (ret == 0, "thread[%ld]: failed to post send", thread_id);
-	    buf_offset = (buf_offset + msg_size) % buf_size;
-	    buf_ptr = buf_base + buf_offset;
-	}
+        for (j = 0; j < num_concurr_msgs; j++) {
+            ret = post_send (msg_size, lkey, (uint64_t)buf_ptr, (uint32_t)i, qp[i], buf_ptr);
+            check (ret == 0, "thread[%ld]: failed to post send", thread_id);
+            buf_offset = (buf_offset + msg_size) % buf_size;
+            buf_ptr = buf_base + buf_offset;
+        }
     }
 
     num_acked_peers = 0;
@@ -119,7 +124,7 @@ void *client_thread_func (void *arg)
                 }
             }
 
-	    if (wc[i].opcode == IBV_WC_RECV) {
+            if (wc[i].opcode == IBV_WC_RECV) {
                 ops_count += 1;
                 debug ("ops_count = %ld", ops_count);
 
@@ -127,30 +132,30 @@ void *client_thread_func (void *arg)
                     gettimeofday (&start, NULL);
                 }
 
-		imm_data = ntohl(wc[i].imm_data);
-		char *msg_ptr = (char *)wc[i].wr_id;
+                imm_data = ntohl(wc[i].imm_data);
+                char *msg_ptr = (char *)wc[i].wr_id;
 
                 if (imm_data == MSG_CTL_STOP) {
-		    num_acked_peers += 1;
-		    if (num_acked_peers == num_peers) {
-			gettimeofday (&end, NULL);
-			stop = true;
-			break;
-		    }
+                    num_acked_peers += 1;
+                    if (num_acked_peers == num_peers) {
+                        gettimeofday (&end, NULL);
+                        stop = true;
+                        break;
+                    }
                 } else {
-		    /* echo the message back */
-		    post_send (msg_size, lkey, 0, imm_data, qp[imm_data], msg_ptr);
-		}
+                    /* echo the message back */
+                    post_send (msg_size, lkey, 0, imm_data, qp[imm_data], msg_ptr);
+                }
 
                 /* post a new receive */
-		ret = post_srq_recv (msg_size, lkey, wc[i].wr_id, srq, msg_ptr);
+                ret = post_srq_recv (msg_size, lkey, wc[i].wr_id, srq, msg_ptr);
             }
         } /* loop through all wc */
     }
 
     /* dump statistics */
     duration   = (double)((end.tv_sec - start.tv_sec) * 1000000 + 
-			  (end.tv_usec - start.tv_usec));
+                          (end.tv_usec - start.tv_usec));
     throughput = (double)(ops_count) / duration;
     log ("thread[%ld]: throughput = %f (Mops/s)",  thread_id, throughput);
 
@@ -159,7 +164,7 @@ void *client_thread_func (void *arg)
 
  error:
     if (wc != NULL) {
-    	free (wc);
+            free (wc);
     }
     pthread_exit ((void *)-1);
 }
@@ -184,16 +189,16 @@ int run_client ()
     check (client_threads != NULL, "Failed to allocate client_threads.");
 
     for (i = 0; i < num_threads; i++) {
-	ret = pthread_create (&client_threads[i], &attr, 
-			      client_thread_func, (void *)i);
-	check (ret == 0, "Failed to create client_thread[%ld]", i);
+        ret = pthread_create (&client_threads[i], &attr, 
+                              client_thread_func, (void *)i);
+        check (ret == 0, "Failed to create client_thread[%ld]", i);
     }
 
     bool thread_ret_normally = true;
     for (i = 0; i < num_threads; i++) {
-	ret = pthread_join (client_threads[i], &status);
-	check (ret == 0, "Failed to join client_thread[%ld].", i);
-	if ((long)status != 0) {
+        ret = pthread_join (client_threads[i], &status);
+        check (ret == 0, "Failed to join client_thread[%ld].", i);
+        if ((long)status != 0) {
             thread_ret_normally = false;
             log ("thread[%ld]: failed to execute", i);
         }

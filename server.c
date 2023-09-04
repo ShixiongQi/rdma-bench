@@ -63,9 +63,10 @@ void *server_thread (void *arg)
     }
 
     /* signal the client to start */
+    printf("signal the client to start...\n");
+
     for (i = 0; i < num_peers; i++) {
-	ret = post_send (0, lkey, 0, MSG_CTL_START, qp[i], buf_base);
-	check (ret == 0, "thread[%ld]: failed to signal the client to start", thread_id);
+        ret = post_send (0, lkey, 0, MSG_CTL_START, qp[i], buf_base); check (ret == 0, "thread[%ld]: failed to signal the client to start", thread_id);
     }
 
     while (stop != true) {
@@ -85,8 +86,8 @@ void *server_thread (void *arg)
                            thread_id, ibv_wc_status_str(wc[i].status));
                 }
             }
-	    
-	    if (wc[i].opcode == IBV_WC_RECV) {
+            
+            if (wc[i].opcode == IBV_WC_RECV) {
                 ops_count += 1;
                 debug ("ops_count = %ld", ops_count);
 
@@ -100,7 +101,7 @@ void *server_thread (void *arg)
                 }
 
                 /* echo the message back */
-		imm_data = ntohl(wc[i].imm_data);
+                imm_data = ntohl(wc[i].imm_data);
                 char *msg_ptr = (char *)wc[i].wr_id;
                 post_send (msg_size, lkey, 0, imm_data, qp[imm_data], msg_ptr);
 
@@ -112,8 +113,7 @@ void *server_thread (void *arg)
 
     /* signal the client to stop */
     for (i = 0; i < num_peers; i++) {
-	ret = post_send (0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[i], ib_res.ib_buf);
-	check (ret == 0, "thread[%ld]: failed to signal the client to stop", thread_id);
+        ret = post_send (0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[i], ib_res.ib_buf); check (ret == 0, "thread[%ld]: failed to signal the client to stop", thread_id);
     }
 
     stop = false;
@@ -124,7 +124,7 @@ void *server_thread (void *arg)
             check (0, "thread[%ld]: Failed to poll cq", thread_id);
         }
 
-	for (i = 0; i < n; i++) {
+        for (i = 0; i < n; i++) {
             if (wc[i].status != IBV_WC_SUCCESS) {
                 if (wc[i].opcode == IBV_WC_SEND) {
                     check (0, "thread[%ld]: send failed status: %s",
@@ -137,11 +137,11 @@ void *server_thread (void *arg)
 
             if (wc[i].opcode == IBV_WC_SEND) {
                 if (wc[i].wr_id == IB_WR_ID_STOP) {
-		    num_acked_peers += 1;
-		    if (num_acked_peers == num_peers) {
-			stop = true;
-			break;
-		    }
+                    num_acked_peers += 1;
+                    if (num_acked_peers == num_peers) {
+                        stop = true;
+                        break;
+                    }
                 }
             }
         }
@@ -158,7 +158,7 @@ void *server_thread (void *arg)
 
  error:
     if (wc != NULL) {
-    	free (wc);
+            free (wc);
     }
     pthread_exit ((void *)-1);
 }
@@ -180,8 +180,8 @@ int run_server ()
     check (threads != NULL, "Failed to allocate threads.");
 
     for (i = 0; i < num_threads; i++) {
-	ret = pthread_create (&threads[i], &attr, server_thread, (void *)i);
-	check (ret == 0, "Failed to create server_thread[%ld]", i);
+        ret = pthread_create (&threads[i], &attr, server_thread, (void *)i);
+        check (ret == 0, "Failed to create server_thread[%ld]", i);
     }
 
     bool thread_ret_normally = true;

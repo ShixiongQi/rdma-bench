@@ -18,6 +18,7 @@ struct ConfigInfo {
     char **clients;          /* list of clients */
     
     bool is_server;          /* if the current node is server */
+    bool is_client;          /* if the current node is client */
     int  rank;               /* the rank of the node */
 
     int  msg_size;           /* the size of each echo message */

@@ -25,78 +25,63 @@ void clean_up_line (char *line)
     *i = 0;
 }
 
-/*
- *  parse_node_list:
- *       get a list of servers or clients
- *
- *  return value:
- *       the number of nodes in the list
- */
+int parse_node_list (char *line, char ***hosts) {
+    int numHosts = 0;
 
-int parse_node_list (char *line, char ***node_list)
-{
-    int start = 0, end = 0, num_nodes=0;
-    char *i = line;
-    char node_name_prefix[128] = {'\0'};
-    char *j = node_name_prefix;
+    // Create a temporary copy of the line
+    char *lineCopy = strdup(line);
+    if (lineCopy == NULL) {
+        perror("Memory allocation error");
+        exit(1);
+    }
 
-    while (*i != '.') {
-        if ((*i >= '0') && (*i <= '9')) {
-            start = start * 10 + *i - '0';
-        } else {
-            *j = *i;
-            j += 1;
+    // Count the number of hostnames first
+    char *token = strtok(line, ",");
+    while (token != NULL) {
+        if (strlen(token) > 0) { // Check for empty tokens
+            numHosts++;
         }
-        i += 1;
+        token = strtok(NULL, ",");
     }
 
-    i += 2;
-    while (*i != 0) {
-        if ((*i >= '0') && (*i <= '9')) {
-            end = end * 10 + *i - '0';
+    // Allocate memory for the hostnames
+    *hosts = (char **) malloc(numHosts * sizeof(char *));
+    if (*hosts == NULL) {
+        perror("Memory allocation error");
+        exit(1);
+    }
+
+    // Reset the temporary line copy
+    strcpy(line, lineCopy);
+
+    // Copy hostnames to the hosts array
+    token = strtok(line, ",");
+    int index = 0;
+    while (token != NULL) {
+        if (strlen(token) > 0) { // Check for empty tokens
+            (*hosts)[index] = strdup(token);
+            if ((*hosts)[index] == NULL) {
+                perror("Memory allocation error");
+                exit(1);
+            }
+            index++;
         }
-        i += 1;
+        token = strtok(NULL, ",");
     }
 
-    num_nodes = end - start + 1;
-    check (num_nodes > 0, "Invaild number of nodes: %d", num_nodes);
+    // Free the temporary copy of the line
+    free(lineCopy);
 
-    *node_list = (char **) calloc (num_nodes, sizeof(char *));
-    if (*node_list == NULL){
-        printf ("Failed to allocate node_list.\n");
-        return 0;
-    }
-
-    int k = 0, node_ind = start;
-    
-    for (k = 0; k < num_nodes; k++) {
-        (*node_list)[k] = (char *) calloc (128, sizeof(char));
-        check ((*node_list)[k] != NULL,
-               "Failed to allocate node_list[%d]", k);
-
-        if (strstr(node_name_prefix, "mnemosyne")) {
-            sprintf ((*node_list)[k], "mnemosyne%02d", node_ind);
-        } else {
-            sprintf ((*node_list)[k], "saguaro%d", node_ind);
-        }
-
-        node_ind += 1;
-    }
-
-    return num_nodes;
-
- error:
-    return -1;
+    return numHosts;
 }
 
-int get_rank ()
-{
-    int			ret	    = 0;
-    uint32_t		i	    = 0;
-    uint32_t		num_servers = config_info.num_servers;
-    uint32_t		num_clients = config_info.num_clients;
-    struct utsname	utsname_buf;
-    char		hostname[64];
+int get_rank () {
+    int	     ret         = 0;
+    uint32_t i           = 0;
+    uint32_t num_servers = config_info.num_servers;
+    uint32_t num_clients = config_info.num_clients;
+    struct   utsname utsname_buf;
+    char     hostname[64];
 
     /* get hostname */
     ret = uname (&utsname_buf);
@@ -104,27 +89,37 @@ int get_rank ()
 
     strncpy (hostname, utsname_buf.nodename, sizeof(hostname));
 
+    // printf("num_servers: %d\n", num_servers);
+    // printf("num_clients: %d\n", num_clients);
+
     config_info.rank = -1;
     for (i = 0; i < num_servers; i++) {
+        // printf("config_info.rank: %d\n", config_info.rank);
+        // printf("config_info.servers[%d]: %s\n", i, config_info.servers[i]);
         if (strstr(hostname, config_info.servers[i])) {
             config_info.rank      = i;
-            config_info.is_server = true;
+            // config_info.is_server = true;
             break;
         }
     }
+    // printf("config_info.rank: %d\n", config_info.rank);
 
     for (i = 0; i < num_clients; i++) {
+        // printf("config_info.rank: %d\n", config_info.rank);
         if (strstr(hostname, config_info.clients[i])) {
-            if (config_info.rank == -1) {
-                config_info.rank      = i;
-                config_info.is_server = false;
-                break;
-            } else {
-                check (0, "node (%s) listed as both server and client", hostname);
-            }
+            config_info.rank      = i;
+            // config_info.is_client = true;
+            break;
+            // if (config_info.rank == -1) {
+            //     config_info.rank      = i;
+            //     config_info.is_server = false;
+            //     break;
+            // } else {
+            //     check (0, "node (%s) listed as both server and client", hostname);
+            // }
         }
     }
-
+    // printf("config_info.rank: %d\n", config_info.rank);
     check (config_info.rank >= 0, "Failed to get rank for node: %s", hostname);
 
     return 0;
@@ -136,13 +131,15 @@ int parse_config_file (char *fname)
 {
     int ret = 0;
     FILE *fp = NULL;
-    char line[128] = {'\0'};
+    char line[256] = {'\0'};
     int  attr = 0;
 
     fp = fopen (fname, "r");
     check (fp != NULL, "Failed to open config file %s", fname);
 
-    while (fgets(line, 128, fp) != NULL) {
+    while (fgets(line, 256, fp) != NULL) {
+        // printf("file name: %s, line: %s\n", fname, line);
+
         // skip comments
         if (strstr(line, "#") != NULL) {
             continue;
@@ -150,7 +147,7 @@ int parse_config_file (char *fname)
 
         clean_up_line (line);
 
-	if (strstr (line, "servers:")) {
+        if (strstr (line, "servers:")) {
             attr = ATTR_SERVERS;
             continue;
         } else if (strstr (line, "clients:")) {
@@ -164,12 +161,14 @@ int parse_config_file (char *fname)
             continue;
         }
 
-	if (attr == ATTR_SERVERS) {
+        if (attr == ATTR_SERVERS) {
             ret = parse_node_list (line, &config_info.servers);
+            // for (int i = 0; i < ret; i++) {printf("Servers %d: %s\n", i + 1, config_info.servers[i]);}
             check (ret > 0, "Failed to get server list");
             config_info.num_servers = ret;
         } else if (attr == ATTR_CLIENTS) {
             ret = parse_node_list (line, &config_info.clients);
+            // for (int i = 0; i < ret; i++) {printf("Clients %d: %s\n", i + 1, config_info.servers[i]);}
             check (ret > 0, "Failed to get client list");
             config_info.num_clients = ret;
         } else if (attr == ATTR_MSG_SIZE) {
@@ -226,15 +225,18 @@ void destroy_config_info ()
     }
 }
 
-void print_config_info ()
-{
+void print_config_info () {
     log (LOG_SUB_HEADER, "Configuraion");
 
     if (config_info.is_server) {
-	log ("is_server                 = %s", "true");
+        log ("is_server = %s", "true");
+    } else if (config_info.is_client) {
+        log ("is_client = %s", "true");
     } else {
-	log ("is_server                 = %s", "false");
+        perror("Not server or client");
+        exit(1);
     }
+
     log ("rank                      = %d", config_info.rank);
     log ("msg_size                  = %d", config_info.msg_size);
     log ("num_concurr_msgs          = %d", config_info.num_concurr_msgs);
