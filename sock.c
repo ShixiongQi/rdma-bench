@@ -8,17 +8,22 @@
 #include "debug.h"
 #include "sock.h"
 
-ssize_t sock_read (int sock_fd, void *buffer, size_t len)
+ssize_t sock_read(int sock_fd, void *buffer, size_t len)
 {
     ssize_t nr, tot_read;
-    char *buf = buffer; // avoid pointer arithmetic on void pointer                                    
+    char *buf = buffer; // avoid pointer arithmetic on void pointer
     tot_read = 0;
 
-    while (len !=0 && (nr = read(sock_fd, buf, len)) != 0) {
-        if (nr < 0) {
-            if (errno == EINTR) {
+    while (len != 0 && (nr = read(sock_fd, buf, len)) != 0)
+    {
+        if (nr < 0)
+        {
+            if (errno == EINTR)
+            {
                 continue;
-            } else {
+            }
+            else
+            {
                 return -1;
             }
         }
@@ -30,18 +35,23 @@ ssize_t sock_read (int sock_fd, void *buffer, size_t len)
     return tot_read;
 }
 
-ssize_t sock_write (int sock_fd, void *buffer, size_t len)
+ssize_t sock_write(int sock_fd, void *buffer, size_t len)
 {
     ssize_t nw, tot_written;
-    const char *buf = buffer;  // avoid pointer arithmetic on void pointer                             
+    const char *buf = buffer; // avoid pointer arithmetic on void pointer
 
-    for (tot_written = 0; tot_written < len; ) {
-        nw = write(sock_fd, buf, len-tot_written);
+    for (tot_written = 0; tot_written < len;)
+    {
+        nw = write(sock_fd, buf, len - tot_written);
 
-        if (nw <= 0) {
-            if (nw == -1 && errno == EINTR) {
+        if (nw <= 0)
+        {
+            if (nw == -1 && errno == EINTR)
+            {
                 continue;
-            } else {
+            }
+            else
+            {
                 return -1;
             }
         }
@@ -52,7 +62,7 @@ ssize_t sock_write (int sock_fd, void *buffer, size_t len)
     return tot_written;
 }
 
-int sock_create_bind (char *port)
+int sock_create_bind(char *port)
 {
     struct addrinfo hints;
     struct addrinfo *result, *rp;
@@ -64,16 +74,19 @@ int sock_create_bind (char *port)
     hints.ai_flags = AI_PASSIVE;
 
     ret = getaddrinfo(NULL, port, &hints, &result);
-    check(ret==0, "getaddrinfo error.");
+    check(ret == 0, "getaddrinfo error.");
 
-    for (rp = result; rp != NULL; rp = rp->ai_next) {
+    for (rp = result; rp != NULL; rp = rp->ai_next)
+    {
         sock_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-        if (sock_fd < 0) {
+        if (sock_fd < 0)
+        {
             continue;
         }
 
         ret = bind(sock_fd, rp->ai_addr, rp->ai_addrlen);
-        if (ret == 0) {
+        if (ret == 0)
+        {
             /* bind success */
             break;
         }
@@ -87,17 +100,19 @@ int sock_create_bind (char *port)
     freeaddrinfo(result);
     return sock_fd;
 
- error:
-    if (result) {
+error:
+    if (result)
+    {
         freeaddrinfo(result);
     }
-    if (sock_fd > 0) {
+    if (sock_fd > 0)
+    {
         close(sock_fd);
     }
     return -1;
 }
 
-int sock_create_connect (char *server_name, char *port)
+int sock_create_connect(char *server_name, char *port)
 {
     struct addrinfo hints;
     struct addrinfo *result, *rp;
@@ -108,16 +123,19 @@ int sock_create_connect (char *server_name, char *port)
     hints.ai_family = AF_UNSPEC;
 
     ret = getaddrinfo(server_name, port, &hints, &result);
-    check(ret==0, "[ERROR] %s", gai_strerror(ret));
+    check(ret == 0, "[ERROR] %s", gai_strerror(ret));
 
-    for (rp = result; rp != NULL; rp = rp->ai_next) {
+    for (rp = result; rp != NULL; rp = rp->ai_next)
+    {
         sock_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-        if (sock_fd == -1) {
+        if (sock_fd == -1)
+        {
             continue;
         }
 
         ret = connect(sock_fd, rp->ai_addr, rp->ai_addrlen);
-        if (ret == 0) {
+        if (ret == 0)
+        {
             /* connection success */
             break;
         }
@@ -126,16 +144,18 @@ int sock_create_connect (char *server_name, char *port)
         sock_fd = -1;
     }
 
-    check(rp!=NULL, "could not connect.");
+    check(rp != NULL, "could not connect.");
 
     freeaddrinfo(result);
     return sock_fd;
 
- error:
-    if (result) {
+error:
+    if (result)
+    {
         freeaddrinfo(result);
     }
-    if (sock_fd != -1) {
+    if (sock_fd != -1)
+    {
         close(sock_fd);
     }
     return -1;
@@ -146,33 +166,45 @@ int sock_set_qp_info(int sock_fd, struct QPInfo *qp_info)
     int n;
     struct QPInfo tmp_qp_info;
 
-    tmp_qp_info.lid       = htons(qp_info->lid);
-    tmp_qp_info.qp_num    = htonl(qp_info->qp_num);
-    tmp_qp_info.rank      = htonl(qp_info->rank);
+    tmp_qp_info.lid = htons(qp_info->lid);
+    tmp_qp_info.qp_num = htonl(qp_info->qp_num);
+    tmp_qp_info.rank = htonl(qp_info->rank);
+    for (int i = 0; i < 16; i++)
+    {
+        printf("%hhd:", qp_info->gid.raw[i]);
+        tmp_qp_info.gid.raw[i] = qp_info->gid.raw[i];
+    }
+    printf("\n");
 
     n = sock_write(sock_fd, (char *)&tmp_qp_info, sizeof(struct QPInfo));
-    check(n==sizeof(struct QPInfo), "write qp_info to socket.");
+    check(n == sizeof(struct QPInfo), "write qp_info to socket.");
 
     return 0;
 
- error:
+error:
     return -1;
 }
 
 int sock_get_qp_info(int sock_fd, struct QPInfo *qp_info)
 {
     int n;
-    struct QPInfo  tmp_qp_info;
+    struct QPInfo tmp_qp_info;
 
     n = sock_read(sock_fd, (char *)&tmp_qp_info, sizeof(struct QPInfo));
-    check(n==sizeof(struct QPInfo), "read qp_info from socket.");
+    check(n == sizeof(struct QPInfo), "read qp_info from socket.");
 
-    qp_info->lid       = ntohs(tmp_qp_info.lid);
-    qp_info->qp_num    = ntohl(tmp_qp_info.qp_num);
-    qp_info->rank      = ntohl(tmp_qp_info.rank);
-    
+    qp_info->lid = ntohs(tmp_qp_info.lid);
+    qp_info->qp_num = ntohl(tmp_qp_info.qp_num);
+    qp_info->rank = ntohl(tmp_qp_info.rank);
+    for (int i = 0; i < 16; i++)
+    {
+        qp_info->gid.raw[i] = tmp_qp_info.gid.raw[i];
+        printf("%hhd:", qp_info->gid.raw[i]);
+    }
+    printf("\n");
+
     return 0;
 
- error:
+error:
     return -1;
 }
