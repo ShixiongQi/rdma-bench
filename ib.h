@@ -14,8 +14,10 @@
 #define IB_SL			0
 #define IB_WR_ID_STOP		0xE000000000000000
 #define NUM_WARMING_UP_OPS      500000
-#define TOT_NUM_OPS             10000000
+#define TOT_NUM_OPS             100000
 #define SIG_INTERVAL            1000
+
+#define PORT_NUM 1
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 static inline uint64_t htonll (uint64_t x) {return bswap_64(x); }
@@ -38,7 +40,7 @@ enum MsgType {
     MSG_CTL_STOP,
 };
 
-int modify_qp_to_rts (struct ibv_qp *qp, uint32_t qp_num, uint16_t lid);
+int modify_qp_to_rts (struct ibv_qp *qp, uint32_t qp_num, uint16_t lid, union ibv_gid my_gid);
 
 int post_send (uint32_t req_size, uint32_t lkey, uint64_t wr_id, 
 	       uint32_t imm_data, struct ibv_qp *qp, char *buf);

@@ -16,6 +16,8 @@ struct IBRes {
     int     num_qps;
     char   *ib_buf;
     size_t  ib_buf_size;
+
+    union ibv_gid my_gid;
 };
 
 extern struct IBRes ib_res;

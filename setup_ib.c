@@ -75,7 +75,7 @@ int connect_qp_server() {
         printf("peer_ind: %d\n", peer_ind);
         printf("Loca qp_num: %"PRIu32", Remote qp_num %"PRIu32"\n", ib_res.qp[peer_ind]->qp_num, remote_qp_info[i].qp_num);
 
-        ret = modify_qp_to_rts (ib_res.qp[peer_ind], remote_qp_info[i].qp_num, remote_qp_info[i].lid); check (ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
+        ret = modify_qp_to_rts (ib_res.qp[peer_ind], remote_qp_info[i].qp_num, remote_qp_info[i].lid, ib_res.my_gid); check (ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
         log ("\tLocal qp[%"PRIu32"] <-> Remote qp[%"PRIu32"]", ib_res.qp[peer_ind]->qp_num, remote_qp_info[i].qp_num);
     }
     log (LOG_SUB_HEADER, "End of IB Config");
@@ -167,7 +167,7 @@ int connect_qp_client() {
         printf("peer_ind: %d\n", peer_ind);
         printf("Loca qp_num: %"PRIu32", Remote qp_num %"PRIu32"\n", ib_res.qp[peer_ind]->qp_num, remote_qp_info[i].qp_num);
 
-        ret = modify_qp_to_rts (ib_res.qp[peer_ind], remote_qp_info[i].qp_num, remote_qp_info[i].lid); check (ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
+        ret = modify_qp_to_rts (ib_res.qp[peer_ind], remote_qp_info[i].qp_num, remote_qp_info[i].lid, ib_res.my_gid); check (ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
         log ("\tLocal qp[%"PRIu32"] <-> Remote qp[%"PRIu32"]", ib_res.qp[peer_ind]->qp_num, remote_qp_info[i].qp_num);
     }
     log (LOG_SUB_HEADER, "End of IB Config");
@@ -229,6 +229,9 @@ int setup_ib() {
     /* create IB context */
     ib_res.ctx = ibv_open_device(*dev_list); check(ib_res.ctx != NULL, "Failed to open ib device.");
 
+    /* query GID (RoCEv2) */
+    ret = ibv_query_gid(ib_res.ctx, PORT_NUM, 0, &ib_res.my_gid); check(!ret, "Failed to query GID.");
+
     /* allocate protection domain */
     ib_res.pd = ibv_alloc_pd(ib_res.ctx); check(ib_res.pd != NULL, "Failed to allocate protection domain.");
 
@@ -258,8 +261,8 @@ int setup_ib() {
     // printf("ib_res.dev_attr.max_qp_wr: %d\n", ib_res.dev_attr.max_qp_wr);
 
     /* create cq */
-    int cqe = 100;
-    // ib_res.cq = ibv_create_cq (ib_res.ctx, ib_res.dev_attr.max_cqe, NULL, NULL, 0);
+    // ib_res.cq = ibv_create_cq (ib_res.ctx, ib_res.dev_attr.max_cqe, NULL, NULL, 0); check (ib_res.cq != NULL, "Failed to create cq");
+    int cqe = 1000;
     ib_res.cq = ibv_create_cq (ib_res.ctx, cqe, NULL, NULL, 0); check (ib_res.cq != NULL, "Failed to create cq");
 
     /* create srq */
@@ -278,8 +281,8 @@ int setup_ib() {
         .cap = {
             // .max_send_wr = ib_res.dev_attr.max_qp_wr,
             // .max_recv_wr = ib_res.dev_attr.max_qp_wr,
-            .max_send_wr = 100,
-            .max_recv_wr = 100,
+            .max_send_wr = 1000,
+            .max_recv_wr = 1000,
             .max_send_sge = 1,
             .max_recv_sge = 1,
         },

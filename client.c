@@ -41,6 +41,8 @@ void *client_thread_func (void *arg)
     double              duration	= 0.0;
     double              throughput	= 0.0;
 
+    gettimeofday (&start, NULL);
+
     /* set thread affinity */
     CPU_ZERO (&cpuset);
     CPU_SET  ((int)thread_id, &cpuset);
@@ -63,13 +65,10 @@ void *client_thread_func (void *arg)
     printf("Client thread-[%ld] wait for start signal...\n", thread_id);
     /* wait for start signal */
     while (start_sending != true) {
-        printf("11111\n");
         do {
-            // printf("33333\n");
             n = ibv_poll_cq (cq, num_wc, wc);
         } while (n < 1);
         check (n > 0, "thread[%ld]: failed to poll cq", thread_id);
-        printf("22222\n");
 
         for (i = 0; i < n; i++) {
             if (wc[i].status != IBV_WC_SUCCESS) {
@@ -90,7 +89,7 @@ void *client_thread_func (void *arg)
             }
         }
     }
-    printf("thread[%ld]: ready to send...\n", thread_id);
+
     log ("thread[%ld]: ready to send", thread_id);
 
     /* pre-post sends */
@@ -154,10 +153,12 @@ void *client_thread_func (void *arg)
     }
 
     /* dump statistics */
-    duration   = (double)((end.tv_sec - start.tv_sec) * 1000000 + 
-                          (end.tv_usec - start.tv_usec));
+    // duration   = (double)((end.tv_sec - start.tv_sec) * 1000000 + 
+    //                       (end.tv_usec - start.tv_usec));
+    duration   = (double)((end.tv_sec - start.tv_sec));
     throughput = (double)(ops_count) / duration;
-    log ("thread[%ld]: throughput = %f (Mops/s)",  thread_id, throughput);
+    log ("thread[%ld]: throughput = %f (ops/s)",  thread_id, throughput);
+    printf ("thread[%ld]: throughput = %f (ops/s)\n",  thread_id, throughput);
 
     free (wc);
     pthread_exit ((void *)0);
