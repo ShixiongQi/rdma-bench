@@ -226,7 +226,7 @@ int setup_ib() {
     ib_res.ctx = ibv_open_device(*dev_list); check(ib_res.ctx != NULL, "Failed to open ib device.");
 
     /* query GID (RoCEv2) */
-    ret = ibv_query_gid(ib_res.ctx, PORT_NUM, 0, &ib_res.my_gid); check(!ret, "Failed to query GID.");
+    ret = ibv_query_gid(ib_res.ctx, IB_PORT, 0, &ib_res.my_gid); check(!ret, "Failed to query GID.");
 
     /* allocate protection domain */
     ib_res.pd = ibv_alloc_pd(ib_res.ctx); check(ib_res.pd != NULL, "Failed to allocate protection domain.");

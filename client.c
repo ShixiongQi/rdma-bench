@@ -41,8 +41,6 @@ void *client_thread_func (void *arg)
     double         duration        = 0.0;
     double         throughput      = 0.0;
 
-    gettimeofday (&start, NULL);
-
     /* set thread affinity */
     CPU_ZERO (&cpuset);
     CPU_SET  ((int)thread_id, &cpuset);
@@ -156,7 +154,7 @@ void *client_thread_func (void *arg)
     // duration   = (double)((end.tv_sec - start.tv_sec) * 1000000 + 
     //                       (end.tv_usec - start.tv_usec));
     duration   = (double)((end.tv_sec - start.tv_sec));
-    throughput = (double)(ops_count) / duration;
+    throughput = (double)(ops_count - NUM_WARMING_UP_OPS) / duration;
     log ("thread[%ld]: throughput = %f (ops/s)",  thread_id, throughput);
     printf ("thread[%ld]: throughput = %f (ops/s)\n",  thread_id, throughput);
 

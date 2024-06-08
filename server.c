@@ -40,8 +40,6 @@ void *server_thread (void *arg)
     double              duration	= 0.0;
     double              throughput	= 0.0;
 
-    gettimeofday (&start, NULL);
-
     wc = (struct ibv_wc *) calloc (num_wc, sizeof(struct ibv_wc));
     check (wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
 
@@ -154,7 +152,7 @@ void *server_thread (void *arg)
     //                       (end.tv_usec - start.tv_usec));
     duration   = (double)((end.tv_sec - start.tv_sec));
 
-    throughput = (double)(ops_count) / duration;
+    throughput = (double)(ops_count - NUM_WARMING_UP_OPS) / duration;
     log ("thread[%ld]: throughput = %f (ops/s)",  thread_id, throughput);
     printf("thread[%ld]: throughput = %f (ops/s); ops_count:%ld, duration: %f seconds \n",  thread_id, throughput, ops_count, duration);
     // printf("start time: %jd\t end time: %jd\n",  start.tv_sec, end.tv_sec);
