@@ -7,10 +7,10 @@
 #include "client.h"
 #include "server.h"
 
-FILE	*log_fp	     = NULL;
+FILE *log_fp = NULL;
 
-int	init_env    ();
-void	destroy_env ();
+int  init_env    ();
+void destroy_env ();
 
 int main (int argc, char *argv[])
 {
@@ -19,7 +19,7 @@ int main (int argc, char *argv[])
     if (argc != 4) {
         printf ("Usage: %s config_file sock_port is_server|is_client\n", argv[0]);
         return 0;
-    }    
+    }
 
     ret = parse_config_file (argv[1]);
     check (ret == 0, "Failed to parse config file");

@@ -11,34 +11,34 @@
 
 void *server_thread (void *arg)
 {
-    int         ret		 = 0, i = 0, j = 0, n = 0;
-    long        thread_id	 = (long) arg;
+    int         ret              = 0, i = 0, j = 0, n = 0;
+    long        thread_id        = (long) arg;
     int         num_concurr_msgs = config_info.num_concurr_msgs;
-    int         msg_size	 = config_info.msg_size;
+    int         msg_size         = config_info.msg_size;
     int         num_peers        = ib_res.num_qps;
 
     pthread_t   self;
     cpu_set_t   cpuset;
 
-    int                  num_wc		= 20;
-    struct ibv_qp       **qp		= ib_res.qp;
-    struct ibv_cq       *cq		= ib_res.cq;
-    struct ibv_srq      *srq            = ib_res.srq;
-    struct ibv_wc       *wc             = NULL;
-    uint32_t             lkey           = ib_res.mr->lkey;
+    int               num_wc  = 20;
+    struct ibv_qp     **qp    = ib_res.qp;
+    struct ibv_cq     *cq     = ib_res.cq;
+    struct ibv_srq    *srq    = ib_res.srq;
+    struct ibv_wc     *wc     = NULL;
+    uint32_t          lkey    = ib_res.mr->lkey;
     
-    char                *buf_ptr	= ib_res.ib_buf;
-    char                *buf_base	= ib_res.ib_buf;
-    int                  buf_offset	= 0;
-    size_t               buf_size	= ib_res.ib_buf_size;
+    char                *buf_ptr    = ib_res.ib_buf;
+    char                *buf_base   = ib_res.ib_buf;
+    int                  buf_offset = 0;
+    size_t               buf_size   = ib_res.ib_buf_size;
     
-    uint32_t            imm_data	= 0;
-    int			num_acked_peers = 0;
+    uint32_t            imm_data        = 0;
+    int                 num_acked_peers = 0;
     bool                stop            = false;
     struct timeval      start, end;
-    long                ops_count	= 0;
-    double              duration	= 0.0;
-    double              throughput	= 0.0;
+    long                ops_count       = 0;
+    double              duration        = 0.0;
+    double              throughput      = 0.0;
 
     wc = (struct ibv_wc *) calloc (num_wc, sizeof(struct ibv_wc));
     check (wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
