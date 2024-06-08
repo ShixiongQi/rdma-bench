@@ -17,7 +17,7 @@ int main (int argc, char *argv[])
     int	ret = 0;
 
     if (argc != 4) {
-        printf ("Usage: %s config_file sock_port is_server|is_client\n", argv[0]);
+        printf ("Usage: %s config_file sock_port is_server | is_client\n", argv[0]);
         return 0;
     }
 
@@ -32,7 +32,7 @@ int main (int argc, char *argv[])
         config_info.is_server = false;
         config_info.is_client = true;
     } else {
-        printf ("Usage: %s config_file sock_port is_server|is_client\n", argv[0]);
+        printf ("Usage: %s config_file sock_port is_server | is_client\n", argv[0]);
         return 0;
     }
 

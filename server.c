@@ -66,7 +66,8 @@ void *server_thread (void *arg)
     printf("signal the client to start...\n");
 
     for (i = 0; i < num_peers; i++) {
-        ret = post_send (0, lkey, 0, MSG_CTL_START, qp[i], buf_base); check (ret == 0, "thread[%ld]: failed to signal the client to start", thread_id);
+        ret = post_send (0, lkey, 0, MSG_CTL_START, qp[i], buf_base);
+        check (ret == 0, "thread[%ld]: failed to signal the client to start", thread_id);
     }
 
     while (stop != true) {
@@ -154,8 +155,7 @@ void *server_thread (void *arg)
 
     throughput = (double)(ops_count - NUM_WARMING_UP_OPS) / duration;
     log ("thread[%ld]: throughput = %f (ops/s)",  thread_id, throughput);
-    printf("thread[%ld]: throughput = %f (ops/s); ops_count:%ld, duration: %f seconds \n",  thread_id, throughput, ops_count, duration);
-    // printf("start time: %jd\t end time: %jd\n",  start.tv_sec, end.tv_sec);
+    printf("thread[%ld]: throughput = %f (ops/s) %f (Bytes/s); ops_count:%ld, duration: %f seconds \n",  thread_id, throughput, throughput * msg_size, ops_count, duration);
 
     free (wc);
     pthread_exit ((void *)0);

@@ -57,6 +57,7 @@ int sock_create_bind (char *port)
     struct addrinfo hints;
     struct addrinfo *result, *rp;
     int sock_fd = -1, ret = 0;
+    int opt = 1;
 
     memset(&hints, 0, sizeof(struct addrinfo));
     hints.ai_socktype = SOCK_STREAM;
@@ -70,6 +71,13 @@ int sock_create_bind (char *port)
         sock_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
         if (sock_fd < 0) {
             continue;
+        }
+
+        // Set SO_REUSEADDR to reuse the address
+        if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+            perror("setsockopt(SO_REUSEADDR) failed");
+            close(sock_fd);
+            return -1;
         }
 
         ret = bind(sock_fd, rp->ai_addr, rp->ai_addrlen);

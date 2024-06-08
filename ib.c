@@ -105,7 +105,7 @@ int post_send (uint32_t req_size, uint32_t lkey, uint64_t wr_id,
         .imm_data   = htonl (imm_data)
     };
 
-    ret = ibv_post_send (qp, &send_wr, &bad_send_wr);
+    ret = ibv_post_send(qp, &send_wr, &bad_send_wr);
     return ret;
 }
 
@@ -127,6 +127,6 @@ int post_srq_recv (uint32_t req_size, uint32_t lkey, uint64_t wr_id,
         .num_sge = 1
     };
 
-    ret = ibv_post_srq_recv (srq, &recv_wr, &bad_recv_wr);
+    ret = ibv_post_srq_recv(srq, &recv_wr, &bad_recv_wr);
     return ret;
 }

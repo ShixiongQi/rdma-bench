@@ -21,17 +21,21 @@ int connect_qp_server() {
     struct QPInfo *local_qp_info = NULL;
     struct QPInfo *remote_qp_info = NULL;
 
-    sockfd = sock_create_bind(config_info.sock_port); check(sockfd > 0, "Failed to create server socket.");
+    sockfd = sock_create_bind(config_info.sock_port);
+    check(sockfd > 0, "Failed to create server socket.");
     listen(sockfd, 5);
 
-    peer_sockfd = (int *) calloc (num_peers, sizeof(int)); check (peer_sockfd != NULL, "Failed to allocate peer_sockfd");
+    peer_sockfd = (int *) calloc (num_peers, sizeof(int));
+    check(peer_sockfd != NULL, "Failed to allocate peer_sockfd");
 
     for (i = 0; i < num_peers; i++) {
-        peer_sockfd[i] = accept(sockfd, (struct sockaddr *)&peer_addr, &peer_addr_len); check (peer_sockfd[i] > 0, "Failed to create peer_sockfd[%d]", i);
+        peer_sockfd[i] = accept(sockfd, (struct sockaddr *)&peer_addr, &peer_addr_len);
+        check(peer_sockfd[i] > 0, "Failed to create peer_sockfd[%d]", i);
     }
 
     /* init local qp_info */
-    local_qp_info = (struct QPInfo *) calloc (num_peers, sizeof(struct QPInfo)); check (local_qp_info != NULL, "Failed to allocate local_qp_info");
+    local_qp_info = (struct QPInfo *) calloc (num_peers, sizeof(struct QPInfo));
+    check (local_qp_info != NULL, "Failed to allocate local_qp_info");
 
     for (i = 0; i < num_peers; i++) {
         local_qp_info[i].lid	= ib_res.port_attr.lid; 
@@ -40,10 +44,12 @@ int connect_qp_server() {
     }
 
     /* get qp_info from client */
-    remote_qp_info = (struct QPInfo *) calloc (num_peers, sizeof(struct QPInfo)); check (remote_qp_info != NULL, "Failed to allocate remote_qp_info");
+    remote_qp_info = (struct QPInfo *) calloc (num_peers, sizeof(struct QPInfo));
+    check (remote_qp_info != NULL, "Failed to allocate remote_qp_info");
 
     for (i = 0; i < num_peers; i++) {
-        ret = sock_get_qp_info (peer_sockfd[i], &remote_qp_info[i]); check (ret == 0, "Failed to get qp_info from client[%d]", i);
+        ret = sock_get_qp_info (peer_sockfd[i], &remote_qp_info[i]);
+        check (ret == 0, "Failed to get qp_info from client[%d]", i);
     }
     
     /* send qp_info to client */
@@ -57,7 +63,8 @@ int connect_qp_server() {
                 break;
             }
         }
-        ret = sock_set_qp_info (peer_sockfd[i], &local_qp_info[peer_ind]); check (ret == 0, "Failed to send qp_info to client[%d]", peer_ind);
+        ret = sock_set_qp_info (peer_sockfd[i], &local_qp_info[peer_ind]);
+        check (ret == 0, "Failed to send qp_info to client[%d]", peer_ind);
     }
 
     /* change send QP state to RTS */
@@ -73,18 +80,21 @@ int connect_qp_server() {
 
         printf("Loca qp_num: %"PRIu32", Remote qp_num %"PRIu32"\n", ib_res.qp[peer_ind]->qp_num, remote_qp_info[i].qp_num);
 
-        ret = modify_qp_to_rts (ib_res.qp[peer_ind], remote_qp_info[i].qp_num, remote_qp_info[i].lid, ib_res.my_gid); check (ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
+        ret = modify_qp_to_rts (ib_res.qp[peer_ind], remote_qp_info[i].qp_num, remote_qp_info[i].lid, ib_res.my_gid);
+        check (ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
         log ("\tLocal qp[%"PRIu32"] <-> Remote qp[%"PRIu32"]", ib_res.qp[peer_ind]->qp_num, remote_qp_info[i].qp_num);
     }
     log (LOG_SUB_HEADER, "End of IB Config");
 
     /* sync with clients */
     for (i = 0; i < num_peers; i++) {
-        n = sock_read (peer_sockfd[i], sock_buf, sizeof(SOCK_SYNC_MSG)); check (n == sizeof(SOCK_SYNC_MSG), "Failed to receive sync from client");
+        n = sock_read (peer_sockfd[i], sock_buf, sizeof(SOCK_SYNC_MSG));
+        check (n == sizeof(SOCK_SYNC_MSG), "Failed to receive sync from client");
     }
     
     for (i = 0; i < num_peers; i++) {
-        n = sock_write (peer_sockfd[i], sock_buf, sizeof(SOCK_SYNC_MSG)); check (n == sizeof(SOCK_SYNC_MSG), "Failed to write sync to client");
+        n = sock_write (peer_sockfd[i], sock_buf, sizeof(SOCK_SYNC_MSG));
+        check (n == sizeof(SOCK_SYNC_MSG), "Failed to write sync to client");
     }
         
     for (i = 0; i < num_peers; i++) {
@@ -120,14 +130,17 @@ int connect_qp_client() {
     struct QPInfo *local_qp_info  = NULL;
     struct QPInfo *remote_qp_info = NULL;
 
-    peer_sockfd = (int *) calloc (num_peers, sizeof(int)); check (peer_sockfd != NULL, "Failed to allocate peer_sockfd");
+    peer_sockfd = (int *) calloc (num_peers, sizeof(int));
+    check (peer_sockfd != NULL, "Failed to allocate peer_sockfd");
 
     for (i = 0; i < num_peers; i++) {
-        peer_sockfd[i] = sock_create_connect (config_info.servers[i], config_info.sock_port); check (peer_sockfd[i] > 0, "Failed to create peer_sockfd[%d]", i);
+        peer_sockfd[i] = sock_create_connect (config_info.servers[i], config_info.sock_port);
+        check (peer_sockfd[i] > 0, "Failed to create peer_sockfd[%d]", i);
     }
 
     /* init local qp_info */
-    local_qp_info = (struct QPInfo *) calloc (num_peers, sizeof(struct QPInfo)); check (local_qp_info != NULL, "Failed to allocate local_qp_info");
+    local_qp_info = (struct QPInfo *) calloc (num_peers, sizeof(struct QPInfo));
+    check (local_qp_info != NULL, "Failed to allocate local_qp_info");
 
     for (i = 0; i < num_peers; i++) {
         local_qp_info[i].lid     = ib_res.port_attr.lid; 
@@ -137,14 +150,17 @@ int connect_qp_client() {
 
     /* send qp_info to server */
     for (i = 0; i < num_peers; i++) {
-        ret = sock_set_qp_info (peer_sockfd[i], &local_qp_info[i]); check (ret == 0, "Failed to send qp_info[%d] to server", i);
+        ret = sock_set_qp_info (peer_sockfd[i], &local_qp_info[i]);
+        check (ret == 0, "Failed to send qp_info[%d] to server", i);
     }
 
     /* get qp_info from server */    
-    remote_qp_info = (struct QPInfo *) calloc (num_peers, sizeof(struct QPInfo)); check (remote_qp_info != NULL, "Failed to allocate remote_qp_info");
+    remote_qp_info = (struct QPInfo *) calloc (num_peers, sizeof(struct QPInfo));
+    check (remote_qp_info != NULL, "Failed to allocate remote_qp_info");
 
     for (i = 0; i < num_peers; i++) {
-        ret = sock_get_qp_info (peer_sockfd[i], &remote_qp_info[i]); check (ret == 0, "Failed to get qp_info[%d] from server", i);
+        ret = sock_get_qp_info (peer_sockfd[i], &remote_qp_info[i]);
+        check (ret == 0, "Failed to get qp_info[%d] from server", i);
     }
     
     /* change QP state to RTS */
@@ -163,18 +179,21 @@ int connect_qp_client() {
 
         printf("Loca qp_num: %"PRIu32", Remote qp_num %"PRIu32"\n", ib_res.qp[peer_ind]->qp_num, remote_qp_info[i].qp_num);
 
-        ret = modify_qp_to_rts (ib_res.qp[peer_ind], remote_qp_info[i].qp_num, remote_qp_info[i].lid, ib_res.my_gid); check (ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
+        ret = modify_qp_to_rts (ib_res.qp[peer_ind], remote_qp_info[i].qp_num, remote_qp_info[i].lid, ib_res.my_gid);
+        check (ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
         log ("\tLocal qp[%"PRIu32"] <-> Remote qp[%"PRIu32"]", ib_res.qp[peer_ind]->qp_num, remote_qp_info[i].qp_num);
     }
     log (LOG_SUB_HEADER, "End of IB Config");
 
     /* sync with server */
     for (i = 0; i < num_peers; i++) {
-        n = sock_write (peer_sockfd[i], sock_buf, sizeof(SOCK_SYNC_MSG)); check (n == sizeof(SOCK_SYNC_MSG), "Failed to write sync to client[%d]", i);
+        n = sock_write (peer_sockfd[i], sock_buf, sizeof(SOCK_SYNC_MSG));
+        check (n == sizeof(SOCK_SYNC_MSG), "Failed to write sync to client[%d]", i);
     }
     
     for (i = 0; i < num_peers; i++) {
-        n = sock_read (peer_sockfd[i], sock_buf, sizeof(SOCK_SYNC_MSG)); check (n == sizeof(SOCK_SYNC_MSG), "Failed to receive sync from client");
+        n = sock_read (peer_sockfd[i], sock_buf, sizeof(SOCK_SYNC_MSG));
+        check (n == sizeof(SOCK_SYNC_MSG), "Failed to receive sync from client");
     }
 
     for (i = 0; i < num_peers; i++) {

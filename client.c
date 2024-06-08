@@ -48,7 +48,7 @@ void *client_thread_func (void *arg)
     ret  = pthread_setaffinity_np (self, sizeof(cpu_set_t), &cpuset);
     check (ret == 0, "thread[%ld]: failed to set thread affinity", thread_id);
 
-    /* pre-post recvs */    
+    /* pre-post recvs */
     wc = (struct ibv_wc *) calloc (num_wc, sizeof(struct ibv_wc));
     check (wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
 
@@ -156,14 +156,14 @@ void *client_thread_func (void *arg)
     duration   = (double)((end.tv_sec - start.tv_sec));
     throughput = (double)(ops_count - NUM_WARMING_UP_OPS) / duration;
     log ("thread[%ld]: throughput = %f (ops/s)",  thread_id, throughput);
-    printf ("thread[%ld]: throughput = %f (ops/s)\n",  thread_id, throughput);
+    printf ("thread[%ld]: throughput = %f (ops/s) %f (Bytes/s)\n",  thread_id, throughput, throughput * msg_size);
 
     free (wc);
     pthread_exit ((void *)0);
 
  error:
     if (wc != NULL) {
-            free (wc);
+        free (wc);
     }
     pthread_exit ((void *)-1);
 }
