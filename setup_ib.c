@@ -71,8 +71,6 @@ int connect_qp_server() {
             }
         }
 
-        printf("remote_qp_info[i].lid: %"PRIu16"\n", remote_qp_info[i].lid);
-        printf("peer_ind: %d\n", peer_ind);
         printf("Loca qp_num: %"PRIu32", Remote qp_num %"PRIu32"\n", ib_res.qp[peer_ind]->qp_num, remote_qp_info[i].qp_num);
 
         ret = modify_qp_to_rts (ib_res.qp[peer_ind], remote_qp_info[i].qp_num, remote_qp_info[i].lid, ib_res.my_gid); check (ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
@@ -163,8 +161,6 @@ int connect_qp_client() {
             }
         }
 
-        printf("remote_qp_info[i].lid: %"PRIu16"\n", remote_qp_info[i].lid);
-        printf("peer_ind: %d\n", peer_ind);
         printf("Loca qp_num: %"PRIu32", Remote qp_num %"PRIu32"\n", ib_res.qp[peer_ind]->qp_num, remote_qp_info[i].qp_num);
 
         ret = modify_qp_to_rts (ib_res.qp[peer_ind], remote_qp_info[i].qp_num, remote_qp_info[i].lid, ib_res.my_gid); check (ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
@@ -256,13 +252,10 @@ int setup_ib() {
     
     /* query IB device attr */
     ret = ibv_query_device(ib_res.ctx, &ib_res.dev_attr); check(ret==0, "Failed to query device");
-    
-    // printf("ib_res.dev_attr.max_cqe: %d\n", ib_res.dev_attr.max_cqe);
-    // printf("ib_res.dev_attr.max_qp_wr: %d\n", ib_res.dev_attr.max_qp_wr);
 
     /* create cq */
-    // ib_res.cq = ibv_create_cq (ib_res.ctx, ib_res.dev_attr.max_cqe, NULL, NULL, 0); check (ib_res.cq != NULL, "Failed to create cq");
-    int cqe = 1000;
+    // ib_res.cq = ibv_create_cq (ib_res.ctx, ib_res.dev_attr.max_cqe - 1, NULL, NULL, 0); check (ib_res.cq != NULL, "Failed to create cq");
+    int cqe = 2 << 16;
     ib_res.cq = ibv_create_cq (ib_res.ctx, cqe, NULL, NULL, 0); check (ib_res.cq != NULL, "Failed to create cq");
 
     /* create srq */
@@ -279,17 +272,14 @@ int setup_ib() {
         .recv_cq = ib_res.cq,
         .srq     = ib_res.srq,
         .cap = {
-            // .max_send_wr = ib_res.dev_attr.max_qp_wr,
-            // .max_recv_wr = ib_res.dev_attr.max_qp_wr,
-            .max_send_wr = 1000,
-            .max_recv_wr = 1000,
+            .max_send_wr = ib_res.dev_attr.max_qp_wr,
+            .max_recv_wr = ib_res.dev_attr.max_qp_wr,
             .max_send_sge = 1,
             .max_recv_sge = 1,
         },
         .qp_type = IBV_QPT_RC,
     };
 
-    // printf("ib_res.num_qps: %d\n", ib_res.num_qps);
     ib_res.qp = (struct ibv_qp **) calloc (ib_res.num_qps, sizeof(struct ibv_qp *)); check (ib_res.qp != NULL, "Failed to allocate qp");
 
     for (i = 0; i < ib_res.num_qps; i++) {
