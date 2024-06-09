@@ -18,6 +18,9 @@ struct ConfigInfo {
     int  num_clients;
     char **servers;          /* list of servers */
     char **clients;          /* list of clients */
+
+    int self_sockfd;
+    int *peer_sockfds;
     
     bool is_server;          /* if the current node is server */
     bool is_client;          /* if the current node is client */

@@ -16,24 +16,22 @@ struct IBRes ib_res;
 int connect_qp_server() {
     int ret = 0, n = 0, i = 0;
     int num_peers = config_info.num_clients;
-    int sockfd = 0;
-    int *peer_sockfd = NULL;
     struct sockaddr_in peer_addr;
     socklen_t peer_addr_len	= sizeof(struct sockaddr_in);
     char sock_buf[64] = {'\0'};
     struct QPInfo *local_qp_info = NULL;
     struct QPInfo *remote_qp_info = NULL;
 
-    sockfd = sock_create_bind(config_info.sock_port);
-    check(sockfd > 0, "Failed to create server socket.");
-    listen(sockfd, 5);
+    config_info.self_sockfd = sock_create_bind(config_info.sock_port);
+    check(config_info.self_sockfd > 0, "Failed to create server socket.");
+    listen(config_info.self_sockfd, 5);
 
-    peer_sockfd = (int *) calloc (num_peers, sizeof(int));
-    check(peer_sockfd != NULL, "Failed to allocate peer_sockfd");
+    config_info.peer_sockfds = (int *) calloc (num_peers, sizeof(int));
+    check(config_info.peer_sockfds != NULL, "Failed to allocate peer_sockfd");
 
     for (i = 0; i < num_peers; i++) {
-        peer_sockfd[i] = accept(sockfd, (struct sockaddr *)&peer_addr, &peer_addr_len);
-        check(peer_sockfd[i] > 0, "Failed to create peer_sockfd[%d]", i);
+        config_info.peer_sockfds[i] = accept(config_info.self_sockfd, (struct sockaddr *)&peer_addr, &peer_addr_len);
+        check(config_info.peer_sockfds[i] > 0, "Failed to create peer_sockfd[%d]", i);
     }
 
     /* init local qp_info */
@@ -51,7 +49,7 @@ int connect_qp_server() {
     check (remote_qp_info != NULL, "Failed to allocate remote_qp_info");
 
     for (i = 0; i < num_peers; i++) {
-        ret = sock_get_qp_info (peer_sockfd[i], &remote_qp_info[i]);
+        ret = sock_get_qp_info (config_info.peer_sockfds[i], &remote_qp_info[i]);
         check (ret == 0, "Failed to get qp_info from client[%d]", i);
     }
     
@@ -66,7 +64,7 @@ int connect_qp_server() {
                 break;
             }
         }
-        ret = sock_set_qp_info (peer_sockfd[i], &local_qp_info[peer_ind]);
+        ret = sock_set_qp_info (config_info.peer_sockfds[i], &local_qp_info[peer_ind]);
         check (ret == 0, "Failed to send qp_info to client[%d]", peer_ind);
     }
 
@@ -91,34 +89,28 @@ int connect_qp_server() {
 
     /* sync with clients */
     for (i = 0; i < num_peers; i++) {
-        n = sock_read (peer_sockfd[i], sock_buf, sizeof(SOCK_SYNC_MSG));
+        n = sock_read (config_info.peer_sockfds[i], sock_buf, sizeof(SOCK_SYNC_MSG));
         check (n == sizeof(SOCK_SYNC_MSG), "Failed to receive sync from client");
     }
     
     for (i = 0; i < num_peers; i++) {
-        n = sock_write (peer_sockfd[i], sock_buf, sizeof(SOCK_SYNC_MSG));
+        n = sock_write (config_info.peer_sockfds[i], sock_buf, sizeof(SOCK_SYNC_MSG));
         check (n == sizeof(SOCK_SYNC_MSG), "Failed to write sync to client");
     }
-        
-    for (i = 0; i < num_peers; i++) {
-        close (peer_sockfd[i]);
-    }
-    free (peer_sockfd);
-    close (sockfd);
-    
+
     return 0;
 
  error:
-    if (peer_sockfd != NULL) {
+    if (config_info.peer_sockfds != NULL) {
         for (i = 0; i < num_peers; i++) {
-            if (peer_sockfd[i] > 0) {
-                close (peer_sockfd[i]);
+            if (config_info.peer_sockfds[i] > 0) {
+                close (config_info.peer_sockfds[i]);
             }
         }
-        free (peer_sockfd);
+        free (config_info.peer_sockfds);
     }
-    if (sockfd > 0) {
-        close (sockfd);
+    if (config_info.self_sockfd > 0) {
+        close (config_info.self_sockfd);
     }
     
     return -1;
@@ -127,18 +119,18 @@ int connect_qp_server() {
 int connect_qp_client() {
     int ret = 0, n = 0, i = 0;
     int num_peers = ib_res.num_qps;
-    int *peer_sockfd = NULL;
+    config_info.self_sockfd = -1;
     char sock_buf[64] = {'\0'};
 
     struct QPInfo *local_qp_info  = NULL;
     struct QPInfo *remote_qp_info = NULL;
 
-    peer_sockfd = (int *) calloc (num_peers, sizeof(int));
-    check (peer_sockfd != NULL, "Failed to allocate peer_sockfd");
+    config_info.peer_sockfds = (int *) calloc (num_peers, sizeof(int));
+    check (config_info.peer_sockfds != NULL, "Failed to allocate peer_sockfd");
 
     for (i = 0; i < num_peers; i++) {
-        peer_sockfd[i] = sock_create_connect (config_info.servers[i], config_info.sock_port);
-        check (peer_sockfd[i] > 0, "Failed to create peer_sockfd[%d]", i);
+        config_info.peer_sockfds[i] = sock_create_connect (config_info.servers[i], config_info.sock_port);
+        check (config_info.peer_sockfds[i] > 0, "Failed to create peer_sockfd[%d]", i);
     }
 
     /* init local qp_info */
@@ -153,7 +145,7 @@ int connect_qp_client() {
 
     /* send qp_info to server */
     for (i = 0; i < num_peers; i++) {
-        ret = sock_set_qp_info (peer_sockfd[i], &local_qp_info[i]);
+        ret = sock_set_qp_info (config_info.peer_sockfds[i], &local_qp_info[i]);
         check (ret == 0, "Failed to send qp_info[%d] to server", i);
     }
 
@@ -162,7 +154,7 @@ int connect_qp_client() {
     check (remote_qp_info != NULL, "Failed to allocate remote_qp_info");
 
     for (i = 0; i < num_peers; i++) {
-        ret = sock_get_qp_info (peer_sockfd[i], &remote_qp_info[i]);
+        ret = sock_get_qp_info (config_info.peer_sockfds[i], &remote_qp_info[i]);
         check (ret == 0, "Failed to get qp_info[%d] from server", i);
     }
     
@@ -190,32 +182,27 @@ int connect_qp_client() {
 
     /* sync with server */
     for (i = 0; i < num_peers; i++) {
-        n = sock_write (peer_sockfd[i], sock_buf, sizeof(SOCK_SYNC_MSG));
+        n = sock_write (config_info.peer_sockfds[i], sock_buf, sizeof(SOCK_SYNC_MSG));
         check (n == sizeof(SOCK_SYNC_MSG), "Failed to write sync to client[%d]", i);
     }
     
     for (i = 0; i < num_peers; i++) {
-        n = sock_read (peer_sockfd[i], sock_buf, sizeof(SOCK_SYNC_MSG));
+        n = sock_read (config_info.peer_sockfds[i], sock_buf, sizeof(SOCK_SYNC_MSG));
         check (n == sizeof(SOCK_SYNC_MSG), "Failed to receive sync from client");
     }
-
-    for (i = 0; i < num_peers; i++) {
-        close (peer_sockfd[i]);
-    }
-    free (peer_sockfd);
 
     free (local_qp_info);
     free (remote_qp_info);
     return 0;
 
  error:
-    if (peer_sockfd != NULL) {
+    if (config_info.peer_sockfds != NULL) {
         for (i = 0; i < num_peers; i++) {
-            if (peer_sockfd[i] > 0) {
-                close (peer_sockfd[i]);
+            if (config_info.peer_sockfds[i] > 0) {
+                close (config_info.peer_sockfds[i]);
             }
         }
-        free (peer_sockfd);
+        free (config_info.peer_sockfds);
     }
 
     if (local_qp_info != NULL) {
@@ -236,7 +223,6 @@ int connect_qp_client() {
         int ret;
         void *buffer;
 
-        // struct rte_mempool *mempool 
         config_info.mempool = rte_mempool_create(MEMPOOL_NAME, 1,
                                         ib_buf_size, 0, 0,
                                         NULL, NULL, NULL, NULL,
@@ -396,6 +382,18 @@ void close_ib_connection() {
 
     if (ib_res.ctx != NULL) {
         ibv_close_device (ib_res.ctx);
+    }
+
+    if (config_info.peer_sockfds != NULL) {
+        for (i = 0; i < config_info.num_clients; i++) {
+            if (config_info.peer_sockfds[i] > 0) {
+                close (config_info.peer_sockfds[i]);
+            }
+        }
+        free (config_info.peer_sockfds);
+    }
+    if (config_info.self_sockfd > 0) {
+        close (config_info.self_sockfd);
     }
 
     if (ib_res.ib_buf != NULL) {
