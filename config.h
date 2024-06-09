@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
+#define USE_RTE_MEMPOOL 1
+
 enum ConfigFileAttr {
     ATTR_SERVERS = 1,
     ATTR_CLIENTS,
@@ -25,6 +27,9 @@ struct ConfigInfo {
     int  num_concurr_msgs;   /* the number of messages can be sent concurrently */
 
     char *sock_port;         /* socket port number */
+
+    struct rte_mempool *mempool;
+    void *rte_mr; // TODO: save a list of registered MRs in rte_mempool
 }__attribute__((aligned(64)));
 
 extern struct ConfigInfo config_info;

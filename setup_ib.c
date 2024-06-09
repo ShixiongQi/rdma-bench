@@ -2,6 +2,9 @@
 #include <unistd.h>
 #include <malloc.h>
 
+#include <rte_mempool.h>
+#include <rte_errno.h>
+
 #include "sock.h"
 #include "ib.h"
 #include "debug.h"
@@ -226,6 +229,42 @@ int connect_qp_client() {
     return -1;
 }
 
+#ifdef USE_RTE_MEMPOOL
+    #define MEMPOOL_NAME "SPRIGHT_MEMPOOL"
+
+    static void* rte_shm_mgr(size_t ib_buf_size) {
+        int ret;
+        void *buffer;
+
+        // struct rte_mempool *mempool 
+        config_info.mempool = rte_mempool_create(MEMPOOL_NAME, 1,
+                                        ib_buf_size, 0, 0,
+                                        NULL, NULL, NULL, NULL,
+                                        rte_socket_id(), 0);
+        if (unlikely(config_info.mempool == NULL)) {
+            fprintf(stderr, "rte_mempool_create() error: %s\n",
+                    rte_strerror(rte_errno));
+            goto error_0;
+        }
+
+        // Allocate DPDK memory and register it
+        ret = rte_mempool_get(config_info.mempool, (void **)&buffer);
+        if (unlikely(ret < 0)) {
+            fprintf(stderr, "rte_mempool_get() error: %s\n",
+                    rte_strerror(-ret));
+            goto error_1;
+        }
+
+        return buffer;
+
+    error_1:
+        rte_mempool_put(config_info.mempool, buffer);
+    error_0:
+        rte_mempool_free(config_info.mempool);
+        return NULL;
+    }
+#endif
+
 int setup_ib() {
     int	ret	= 0;
     int i = 0;
@@ -259,7 +298,11 @@ int setup_ib() {
     /* occupies the second half */
     /* assume all msgs are of the same content */
     ib_res.ib_buf_size = config_info.msg_size * config_info.num_concurr_msgs * ib_res.num_qps;
+#ifdef USE_RTE_MEMPOOL
+    ib_res.ib_buf      = (char *) rte_shm_mgr(ib_res.ib_buf_size);
+#else
     ib_res.ib_buf      = (char *) memalign (4096, ib_res.ib_buf_size);
+#endif
     check (ib_res.ib_buf != NULL, "Failed to allocate ib_buf");
 
     ib_res.mr = ibv_reg_mr (ib_res.pd, (void *)ib_res.ib_buf,
@@ -356,6 +399,15 @@ void close_ib_connection() {
     }
 
     if (ib_res.ib_buf != NULL) {
+#ifdef USE_RTE_MEMPOOL
+        rte_mempool_put(config_info.mempool, ib_res.ib_buf);
+#else
         free (ib_res.ib_buf);
+#endif
     }
+
+#ifdef USE_RTE_MEMPOOL
+    /* Clean up rte mempool */
+    rte_mempool_free(config_info.mempool);
+#endif
 }

@@ -1,5 +1,9 @@
 #include <stdio.h>
 
+#include <rte_branch_prediction.h>
+#include <rte_eal.h>
+#include <rte_errno.h>
+
 #include "debug.h"
 #include "config.h"
 #include "ib.h"
@@ -16,8 +20,24 @@ int main (int argc, char *argv[])
 {
     int	ret = 0;
 
+#ifdef USE_RTE_MEMPOOL
+	ret = rte_eal_init(argc, argv);
+	if (unlikely(ret == -1)) {
+		fprintf(stderr, "rte_eal_init() error: %s\n",
+		        rte_strerror(rte_errno));
+	    return 1;
+	}
+
+	argc -= ret;
+	argv += ret;
+#endif
+
     if (argc != 4) {
-        printf ("Usage: %s config_file sock_port is_server | is_client\n", argv[0]);
+#ifdef USE_RTE_MEMPOOL
+        printf("Usage: %s l 0 --file-prefix=$UNIQUE_NAME --proc-type=primary --no-telemetry --no-pci -- config_file sock_port is_server | is_client\n", argv[0]);
+#else
+        printf("Usage: %s config_file sock_port is_server | is_client\n", argv[0]);
+#endif
         return 0;
     }
 
@@ -32,7 +52,11 @@ int main (int argc, char *argv[])
         config_info.is_server = false;
         config_info.is_client = true;
     } else {
-        printf ("Usage: %s config_file sock_port is_server | is_client\n", argv[0]);
+#ifdef USE_RTE_MEMPOOL
+        printf("Usage: %s l 0 --file-prefix=$UNIQUE_NAME --proc-type=primary --no-telemetry --no-pci -- config_file sock_port is_server | is_client\n", argv[0]);
+#else
+        printf("Usage: %s config_file sock_port is_server | is_client\n", argv[0]);
+#endif
         return 0;
     }
 
@@ -54,6 +78,9 @@ int main (int argc, char *argv[])
  error:
     close_ib_connection ();
     destroy_env         ();
+#ifdef USE_RTE_MEMPOOL
+    rte_eal_cleanup();
+#endif
     return ret;
 }    
 

@@ -89,37 +89,20 @@ int get_rank () {
 
     strncpy (hostname, utsname_buf.nodename, sizeof(hostname));
 
-    // printf("num_servers: %d\n", num_servers);
-    // printf("num_clients: %d\n", num_clients);
-
     config_info.rank = -1;
     for (i = 0; i < num_servers; i++) {
-        // printf("config_info.rank: %d\n", config_info.rank);
-        // printf("config_info.servers[%d]: %s\n", i, config_info.servers[i]);
         if (strstr(hostname, config_info.servers[i])) {
             config_info.rank      = i;
-            // config_info.is_server = true;
             break;
         }
     }
-    // printf("config_info.rank: %d\n", config_info.rank);
 
     for (i = 0; i < num_clients; i++) {
-        // printf("config_info.rank: %d\n", config_info.rank);
         if (strstr(hostname, config_info.clients[i])) {
             config_info.rank      = i;
-            // config_info.is_client = true;
             break;
-            // if (config_info.rank == -1) {
-            //     config_info.rank      = i;
-            //     config_info.is_server = false;
-            //     break;
-            // } else {
-            //     check (0, "node (%s) listed as both server and client", hostname);
-            // }
         }
     }
-    // printf("config_info.rank: %d\n", config_info.rank);
     check (config_info.rank >= 0, "Failed to get rank for node: %s", hostname);
 
     return 0;
@@ -138,8 +121,6 @@ int parse_config_file (char *fname)
     check (fp != NULL, "Failed to open config file %s", fname);
 
     while (fgets(line, 256, fp) != NULL) {
-        // printf("file name: %s, line: %s\n", fname, line);
-
         // skip comments
         if (strstr(line, "#") != NULL) {
             continue;
@@ -163,12 +144,10 @@ int parse_config_file (char *fname)
 
         if (attr == ATTR_SERVERS) {
             ret = parse_node_list (line, &config_info.servers);
-            // for (int i = 0; i < ret; i++) {printf("Servers %d: %s\n", i + 1, config_info.servers[i]);}
             check (ret > 0, "Failed to get server list");
             config_info.num_servers = ret;
         } else if (attr == ATTR_CLIENTS) {
             ret = parse_node_list (line, &config_info.clients);
-            // for (int i = 0; i < ret; i++) {printf("Clients %d: %s\n", i + 1, config_info.servers[i]);}
             check (ret > 0, "Failed to get client list");
             config_info.num_clients = ret;
         } else if (attr == ATTR_MSG_SIZE) {
