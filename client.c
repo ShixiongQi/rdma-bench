@@ -151,10 +151,9 @@ void *client_thread_func (void *arg)
     }
 
     /* dump statistics */
-    // duration   = (double)((end.tv_sec - start.tv_sec) * 1000000 + 
-    //                       (end.tv_usec - start.tv_usec));
-    duration   = (double)((end.tv_sec - start.tv_sec));
+    duration   = (double)((end.tv_sec - start.tv_sec) + (double) (end.tv_usec - start.tv_usec) / 1000000);
     throughput = (double)(ops_count - NUM_WARMING_UP_OPS) / duration;
+
     log ("thread[%ld]: throughput = %f (ops/s)",  thread_id, throughput);
     printf ("thread[%ld]: throughput = %f (ops/s) %f (Bytes/s)\n",  thread_id, throughput, throughput * msg_size);
 
