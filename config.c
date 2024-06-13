@@ -85,7 +85,7 @@ int get_rank () {
 
     /* get hostname */
     ret = uname (&utsname_buf);
-    check (ret == 0, "Failed to call uname");
+    check(ret == 0, "Failed to call uname");
 
     strncpy (hostname, utsname_buf.nodename, sizeof(hostname));
 
@@ -103,7 +103,7 @@ int get_rank () {
             break;
         }
     }
-    check (config_info.rank >= 0, "Failed to get rank for node: %s", hostname);
+    check(config_info.rank >= 0, "Failed to get rank for node: %s", hostname);
 
     return 0;
  error:
@@ -118,7 +118,7 @@ int parse_config_file (char *fname)
     int  attr = 0;
 
     fp = fopen (fname, "r");
-    check (fp != NULL, "Failed to open config file %s", fname);
+    check(fp != NULL, "Failed to open config file %s", fname);
 
     while (fgets(line, 256, fp) != NULL) {
         // skip comments
@@ -144,20 +144,20 @@ int parse_config_file (char *fname)
 
         if (attr == ATTR_SERVERS) {
             ret = parse_node_list (line, &config_info.servers);
-            check (ret > 0, "Failed to get server list");
+            check(ret > 0, "Failed to get server list");
             config_info.num_servers = ret;
         } else if (attr == ATTR_CLIENTS) {
             ret = parse_node_list (line, &config_info.clients);
-            check (ret > 0, "Failed to get client list");
+            check(ret > 0, "Failed to get client list");
             config_info.num_clients = ret;
         } else if (attr == ATTR_MSG_SIZE) {
             config_info.msg_size = atoi(line);
-            check (config_info.msg_size > 0,
+            check(config_info.msg_size > 0,
                    "Invalid Value: msg_size = %d",
                    config_info.msg_size);
         } else if (attr == ATTR_NUM_CONCURR_MSGS) {
             config_info.num_concurr_msgs = atoi(line);
-            check (config_info.num_concurr_msgs > 0,
+            check(config_info.num_concurr_msgs > 0,
                    "Invalid Value: num_concurr_msgs = %d",
                    config_info.num_concurr_msgs);
         }
@@ -166,7 +166,7 @@ int parse_config_file (char *fname)
     }
 
     ret = get_rank ();
-    check (ret == 0, "Failed to get rank");
+    check(ret == 0, "Failed to get rank");
 
     fclose (fp);
 

@@ -42,7 +42,7 @@ int main (int argc, char *argv[])
     }
 
     ret = parse_config_file (argv[1]);
-    check (ret == 0, "Failed to parse config file");
+    check(ret == 0, "Failed to parse config file");
     config_info.sock_port = argv[2];
 
     if (strstr("is_server", argv[3])) {
@@ -61,10 +61,10 @@ int main (int argc, char *argv[])
     }
 
     ret = init_env ();
-    check (ret == 0, "Failed to init env");
+    check(ret == 0, "Failed to init env");
 
     ret = setup_ib ();
-    check (ret == 0, "Failed to setup IB");
+    check(ret == 0, "Failed to setup IB");
 
     if (config_info.is_server) {
         printf("Running Server...\n");
@@ -73,7 +73,7 @@ int main (int argc, char *argv[])
         printf("Running Client...\n");
         ret = run_client ();
     }
-    check (ret == 0, "Failed to run workload");
+    check(ret == 0, "Failed to run workload");
 
  error:
     close_ib_connection ();
@@ -94,7 +94,7 @@ int init_env ()
         sprintf (fname, "client-%d.log", config_info.rank);
     }
     log_fp = fopen (fname, "w");
-    check (log_fp != NULL, "Failed to open log file");
+    check(log_fp != NULL, "Failed to open log file");
 
     log (LOG_HEADER, "IB Echo Server");
     print_config_info ();

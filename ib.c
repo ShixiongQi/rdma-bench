@@ -23,7 +23,7 @@ int modify_qp_to_rts (struct ibv_qp *qp, uint32_t target_qp_num, uint16_t target
     ret = ibv_modify_qp (qp, &qp_attr,
              IBV_QP_STATE | IBV_QP_PKEY_INDEX |
              IBV_QP_PORT  | IBV_QP_ACCESS_FLAGS);
-    check (ret == 0, "Failed to modify qp to INIT.");
+    check(ret == 0, "Failed to modify qp to INIT.");
     }
 
     /* Change QP state to RTR */
@@ -58,7 +58,7 @@ int modify_qp_to_rts (struct ibv_qp *qp, uint32_t target_qp_num, uint16_t target
                 IBV_QP_MAX_DEST_RD_ATOMIC |
                 IBV_QP_MIN_RNR_TIMER |
                 0);
-    check (ret == 0, "Failed to change qp to rtr.");
+    check(ret == 0, "Failed to change qp to rtr.");
     }
 
     /* Change QP state to RTS */
@@ -76,7 +76,7 @@ int modify_qp_to_rts (struct ibv_qp *qp, uint32_t target_qp_num, uint16_t target
                              IBV_QP_STATE | IBV_QP_TIMEOUT |
                              IBV_QP_RETRY_CNT | IBV_QP_RNR_RETRY |
                              IBV_QP_SQ_PSN | IBV_QP_MAX_QP_RD_ATOMIC);
-        check (ret == 0, "Failed to modify qp to RTS.");
+        check(ret == 0, "Failed to modify qp to RTS.");
     }
 
     return 0;
