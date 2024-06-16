@@ -13,6 +13,28 @@
 
 struct IBRes ib_res;
 
+void print_ibv_gid(union ibv_gid gid) {
+    printf("Raw GID: ");
+    for (int i = 0; i < 16; ++i) {
+        printf("%02x", gid.raw[i]);
+        if (i % 2 && i != 15) {
+            printf(":");
+        }
+    }
+    printf("\n");
+
+    printf("Subnet Prefix: 0x%" PRIx64 "\n", (uint64_t) gid.global.subnet_prefix);
+    printf("Interface ID: 0x%" PRIx64 "\n", (uint64_t) gid.global.interface_id);
+}
+
+void print_qp_info(struct QPInfo *qp_info) {
+    printf("LID: %u\n", qp_info->lid);
+    printf("QP Number: %u\n", qp_info->qp_num);
+    printf("Rank: %u\n", qp_info->rank);
+    printf("GID Index: %u\n", qp_info->gid_index);
+    print_ibv_gid(qp_info->gid);
+}
+
 int connect_qp_server() {
     int ret = 0, n = 0, i = 0;
     int num_peers = config_info.num_clients;
@@ -39,9 +61,11 @@ int connect_qp_server() {
     check(local_qp_info != NULL, "Failed to allocate local_qp_info");
 
     for (i = 0; i < num_peers; i++) {
-        local_qp_info[i].lid	= ib_res.port_attr.lid; 
-        local_qp_info[i].qp_num = ib_res.qp[i]->qp_num;
-        local_qp_info[i].rank   = config_info.rank;
+        local_qp_info[i].lid       = ib_res.port_attr.lid; 
+        local_qp_info[i].qp_num    = ib_res.qp[i]->qp_num;
+        local_qp_info[i].rank      = config_info.rank;
+        local_qp_info[i].gid_index = config_info.sgid_index;
+        local_qp_info[i].gid       = ib_res.sgid;
     }
 
     /* get qp_info from client */
@@ -79,9 +103,16 @@ int connect_qp_server() {
             }
         }
 
-        printf("Loca qp_num: %"PRIu32", Remote qp_num %"PRIu32"\n", ib_res.qp[peer_ind]->qp_num, remote_qp_info[i].qp_num);
+        printf("Loca qp_num: %"PRIu32", Remote qp_num %"PRIu32"\n", local_qp_info[peer_ind].qp_num, remote_qp_info[i].qp_num);
 
-        ret = modify_qp_to_rts (ib_res.qp[peer_ind], remote_qp_info[i].qp_num, remote_qp_info[i].lid, ib_res.my_gid);
+        printf("Local QP info: \n");
+        print_qp_info(&local_qp_info[peer_ind]);
+        printf("\n");
+        printf("Remote QP info: \n");
+        print_qp_info(&remote_qp_info[i]);
+        printf("\n");
+
+        ret = modify_qp_to_rts (ib_res.qp[peer_ind], &local_qp_info[peer_ind], &remote_qp_info[i]);
         check(ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
         log ("\tLocal qp[%"PRIu32"] <-> Remote qp[%"PRIu32"]", ib_res.qp[peer_ind]->qp_num, remote_qp_info[i].qp_num);
     }
@@ -138,9 +169,11 @@ int connect_qp_client() {
     check(local_qp_info != NULL, "Failed to allocate local_qp_info");
 
     for (i = 0; i < num_peers; i++) {
-        local_qp_info[i].lid     = ib_res.port_attr.lid; 
-        local_qp_info[i].qp_num  = ib_res.qp[i]->qp_num; 
-        local_qp_info[i].rank    = config_info.rank;
+        local_qp_info[i].lid       = ib_res.port_attr.lid; 
+        local_qp_info[i].qp_num    = ib_res.qp[i]->qp_num; 
+        local_qp_info[i].rank      = config_info.rank;
+        local_qp_info[i].gid_index = config_info.sgid_index;
+        local_qp_info[i].gid       = ib_res.sgid;
     }
 
     /* send qp_info to server */
@@ -172,9 +205,16 @@ int connect_qp_client() {
             }
         }
 
-        printf("Loca qp_num: %"PRIu32", Remote qp_num %"PRIu32"\n", ib_res.qp[peer_ind]->qp_num, remote_qp_info[i].qp_num);
+        printf("Loca qp_num: %"PRIu32", Remote qp_num %"PRIu32"\n", local_qp_info[peer_ind].qp_num, remote_qp_info[i].qp_num);
 
-        ret = modify_qp_to_rts (ib_res.qp[peer_ind], remote_qp_info[i].qp_num, remote_qp_info[i].lid, ib_res.my_gid);
+        printf("Local QP info: \n");
+        print_qp_info(&local_qp_info[peer_ind]);
+        printf("\n");
+        printf("Remote QP info: \n");
+        print_qp_info(&remote_qp_info[i]);
+        printf("\n");
+
+        ret = modify_qp_to_rts(ib_res.qp[peer_ind], &local_qp_info[peer_ind], &remote_qp_info[i]);
         check(ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
         log ("\tLocal qp[%"PRIu32"] <-> Remote qp[%"PRIu32"]", ib_res.qp[peer_ind]->qp_num, remote_qp_info[i].qp_num);
     }
@@ -254,8 +294,9 @@ int connect_qp_client() {
 int setup_ib() {
     int	ret	= 0;
     int i = 0;
+    int num_devices = 0;
     struct ibv_device **dev_list = NULL;    
-    memset (&ib_res, 0, sizeof(struct IBRes));
+    memset(&ib_res, 0, sizeof(struct IBRes));
 
     if (config_info.is_server) {
         ib_res.num_qps = config_info.num_clients;
@@ -264,24 +305,28 @@ int setup_ib() {
     }
 
     /* get IB device list */
-    dev_list = ibv_get_device_list(NULL);
+    dev_list = ibv_get_device_list(&num_devices);
     check(dev_list != NULL, "Failed to get ib device list.");
 
     /* create IB context */
-    ib_res.ctx = ibv_open_device(*dev_list);
+    ib_res.ctx = ibv_open_device(dev_list[config_info.dev_index]);
     check(ib_res.ctx != NULL, "Failed to open ib device.");
-
-    /* query GID (RoCEv2) */
-    ret = ibv_query_gid(ib_res.ctx, IB_PORT, 0, &ib_res.my_gid);
-    check(!ret, "Failed to query GID.");
 
     /* allocate protection domain */
     ib_res.pd = ibv_alloc_pd(ib_res.ctx);
     check(ib_res.pd != NULL, "Failed to allocate protection domain.");
 
     /* query IB port attribute */
-    ret = ibv_query_port(ib_res.ctx, IB_PORT, &ib_res.port_attr);
+    ret = ibv_query_port(ib_res.ctx, config_info.sgid_index, &ib_res.port_attr);
     check(ret == 0, "Failed to query IB port information.");
+
+    /* query GID (RoCEv2) */
+    if (ib_res.port_attr.lid == 0 && ib_res.port_attr.link_layer == IBV_LINK_LAYER_ETHERNET) {
+        ret = ibv_query_gid(ib_res.ctx, config_info.sgid_index, config_info.dev_index, &ib_res.sgid);
+        check(!ret, "Failed to query GID.");
+
+        print_ibv_gid(ib_res.sgid);
+    }
     
     /* register mr */
     /* set the buf_size twice as large as msg_size * num_concurr_msgs */
@@ -308,9 +353,7 @@ int setup_ib() {
     check(ret==0, "Failed to query device");
 
     /* create cq */
-    // ib_res.cq = ibv_create_cq (ib_res.ctx, ib_res.dev_attr.max_cqe - 1, NULL, NULL, 0); check(ib_res.cq != NULL, "Failed to create cq");
-    int cqe = 2 << 16;
-    ib_res.cq = ibv_create_cq (ib_res.ctx, cqe, NULL, NULL, 0);
+    ib_res.cq = ibv_create_cq(ib_res.ctx, ib_res.dev_attr.max_cqe - 1, NULL, NULL, 0);
     check(ib_res.cq != NULL, "Failed to create cq");
 
     /* create srq */
@@ -345,9 +388,9 @@ int setup_ib() {
 
     /* connect QP */
     if (config_info.is_server) {
-        ret = connect_qp_server ();
+        ret = connect_qp_server();
     } else {
-        ret = connect_qp_client ();
+        ret = connect_qp_client();
     }
     check(ret == 0, "Failed to connect qp");
 

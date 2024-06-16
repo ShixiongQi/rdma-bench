@@ -32,11 +32,11 @@ int main (int argc, char *argv[])
 	argv += ret;
 #endif
 
-    if (argc != 4) {
+    if (argc != 6) {
 #ifdef USE_RTE_MEMPOOL
-        printf("Usage: %s l 0 --file-prefix=$UNIQUE_NAME --proc-type=primary --no-telemetry --no-pci -- config_file sock_port is_server | is_client\n", argv[0]);
+        printf("Usage: %s l 0 --file-prefix=$UNIQUE_NAME --proc-type=primary --no-telemetry --no-pci -- config_file sock_port is_server | is_client dev_index sgid_index\n", argv[0]);
 #else
-        printf("Usage: %s config_file sock_port is_server | is_client\n", argv[0]);
+        printf("Usage: %s config_file sock_port is_server | is_client dev_index sgid_index\n", argv[0]);
 #endif
         return 0;
     }
@@ -53,17 +53,20 @@ int main (int argc, char *argv[])
         config_info.is_client = true;
     } else {
 #ifdef USE_RTE_MEMPOOL
-        printf("Usage: %s l 0 --file-prefix=$UNIQUE_NAME --proc-type=primary --no-telemetry --no-pci -- config_file sock_port is_server | is_client\n", argv[0]);
+        printf("Usage: %s l 0 --file-prefix=$UNIQUE_NAME --proc-type=primary --no-telemetry --no-pci -- config_file sock_port is_server | is_client dev_index sgid_index\n", argv[0]);
 #else
-        printf("Usage: %s config_file sock_port is_server | is_client\n", argv[0]);
+        printf("Usage: %s config_file sock_port is_server | is_client dev_index sgid_index\n", argv[0]);
 #endif
         return 0;
     }
 
-    ret = init_env ();
+	config_info.dev_index  = atoi(argv[4]);
+	config_info.sgid_index = atoi(argv[5]);
+
+    ret = init_env();
     check(ret == 0, "Failed to init env");
 
-    ret = setup_ib ();
+    ret = setup_ib();
     check(ret == 0, "Failed to setup IB");
 
     if (config_info.is_server) {

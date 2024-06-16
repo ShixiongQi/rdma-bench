@@ -28,6 +28,8 @@ struct ConfigInfo {
 
     int  msg_size;           /* the size of each echo message */
     int  num_concurr_msgs;   /* the number of messages can be sent concurrently */
+    int  sgid_index;         /* local GID index of in ibv_devinfo -v */
+    int  dev_index;          /* device index of in ibv_devinfo */
 
     char *sock_port;         /* socket port number */
 

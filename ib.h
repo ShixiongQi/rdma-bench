@@ -10,7 +10,6 @@
 #include <rdma/rdma_cma.h>
 
 #define IB_MTU			IBV_MTU_1024
-#define IB_PORT			1
 #define IB_SL			0
 #define IB_WR_ID_STOP		0xE000000000000000
 #define NUM_WARMING_UP_OPS      5000
@@ -31,6 +30,8 @@ struct QPInfo {
     uint16_t lid;
     uint32_t qp_num;
     uint32_t rank;
+    union ibv_gid gid;
+    uint8_t gid_index;
 }__attribute__ ((packed));
 
 enum MsgType {
@@ -38,12 +39,12 @@ enum MsgType {
     MSG_CTL_STOP,
 };
 
-int modify_qp_to_rts (struct ibv_qp *qp, uint32_t qp_num, uint16_t lid, union ibv_gid my_gid);
+int modify_qp_to_rts(struct ibv_qp *qp, struct QPInfo *local, struct QPInfo *remote);
 
-int post_send (uint32_t req_size, uint32_t lkey, uint64_t wr_id, 
+int post_send(uint32_t req_size, uint32_t lkey, uint64_t wr_id, 
 	       uint32_t imm_data, struct ibv_qp *qp, char *buf);
 
-int post_srq_recv (uint32_t req_size, uint32_t lkey, uint64_t wr_id, 
+int post_srq_recv(uint32_t req_size, uint32_t lkey, uint64_t wr_id, 
 		   struct ibv_srq *srq, char *buf);
 
 

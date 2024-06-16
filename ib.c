@@ -4,7 +4,7 @@
 #include "ib.h"
 #include "debug.h"
 
-int modify_qp_to_rts (struct ibv_qp *qp, uint32_t target_qp_num, uint16_t target_lid, union ibv_gid gid)
+int modify_qp_to_rts (struct ibv_qp *qp, struct QPInfo *local, struct QPInfo *remote)
 {
     int ret = 0;
 
@@ -13,7 +13,7 @@ int modify_qp_to_rts (struct ibv_qp *qp, uint32_t target_qp_num, uint16_t target
     struct ibv_qp_attr qp_attr = {
         .qp_state        = IBV_QPS_INIT,
         .pkey_index      = 0,
-        .port_num        = IB_PORT,
+        .port_num        = local->gid_index,
         .qp_access_flags = IBV_ACCESS_LOCAL_WRITE |
                            IBV_ACCESS_REMOTE_READ |
                            IBV_ACCESS_REMOTE_ATOMIC |
@@ -29,24 +29,24 @@ int modify_qp_to_rts (struct ibv_qp *qp, uint32_t target_qp_num, uint16_t target
     /* Change QP state to RTR */
     {
     struct ibv_qp_attr  qp_attr = {
-        .qp_state           = IBV_QPS_RTR,
-        .path_mtu           = IB_MTU,
-        .dest_qp_num        = target_qp_num,
-        .rq_psn             = 0,
-        .max_dest_rd_atomic = 1,
-        .min_rnr_timer      = 12,
-        .ah_attr.is_global  = 0, // grh is invalid
-        .ah_attr.dlid       = target_lid, // Not used for RoCEv2
-        .ah_attr.sl         = IB_SL, // Service level
+        .qp_state              = IBV_QPS_RTR,
+        .path_mtu              = IB_MTU,
+        .dest_qp_num           = remote->qp_num,
+        .rq_psn                = 0,
+        .max_dest_rd_atomic    = 1,
+        .min_rnr_timer         = 12,
+        .ah_attr.is_global     = 0, // grh is invalid
+        .ah_attr.dlid          = remote->lid, // Not used for RoCEv2
+        .ah_attr.sl            = IB_SL, // Service level
         .ah_attr.src_path_bits = 0,
-        .ah_attr.port_num      = IB_PORT,
+        .ah_attr.port_num      = local->gid_index,
     };
 
     if (qp_attr.ah_attr.dlid == 0) {
-        printf("using gid\n");
+        printf("Using RoCEv2 transport\n");
         qp_attr.ah_attr.is_global = 1; // grh is valid for RoCEv2
-        qp_attr.ah_attr.grh.sgid_index = 0;
-        qp_attr.ah_attr.grh.dgid = gid;
+        qp_attr.ah_attr.grh.sgid_index = local->gid_index - 1;
+        qp_attr.ah_attr.grh.dgid = remote->gid;
         qp_attr.ah_attr.grh.hop_limit = 0xFF;
         qp_attr.ah_attr.grh.traffic_class = 0;
         qp_attr.ah_attr.grh.flow_label = 0;
