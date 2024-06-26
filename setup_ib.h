@@ -18,6 +18,10 @@ struct IBRes {
     size_t  ib_buf_size;
 
     union ibv_gid sgid;
+
+    /* Used for one-sided WRITE */
+    uint32_t rkey;
+    uint64_t raddr;
 };
 
 extern struct IBRes ib_res;

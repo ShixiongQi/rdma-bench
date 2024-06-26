@@ -13,7 +13,7 @@
 #define IB_SL			0
 #define IB_WR_ID_STOP		0xE000000000000000
 #define NUM_WARMING_UP_OPS      5000
-#define TOT_NUM_OPS             100000
+#define TOT_NUM_OPS             10000000
 #define SIG_INTERVAL            1000
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
@@ -47,5 +47,12 @@ int post_send(uint32_t req_size, uint32_t lkey, uint64_t wr_id,
 int post_srq_recv(uint32_t req_size, uint32_t lkey, uint64_t wr_id, 
 		   struct ibv_srq *srq, char *buf);
 
+int post_write_signaled (uint32_t req_size, uint32_t lkey, uint64_t wr_id,
+			 struct ibv_qp *qp, char *buf,
+			 uint64_t raddr, uint32_t rkey);
+
+int post_write_unsignaled (uint32_t req_size, uint32_t lkey, uint64_t wr_id,
+			   struct ibv_qp *qp, char *buf,
+			   uint64_t raddr, uint32_t rkey);
 
 #endif /*ib.h*/
