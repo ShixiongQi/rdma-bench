@@ -35,3 +35,9 @@ rdma-tutorial
 
 # Output files
 *.log
+
+# ctags file
+tags
+
+# cfg backup file
+cfg/*.bak
