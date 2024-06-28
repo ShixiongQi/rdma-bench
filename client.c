@@ -9,7 +9,19 @@
 #include "ib.h"
 #include "client.h"
 
-void *client_thread_func (void *arg)
+void *client_thread_write_signaled(void *arg) {
+    return NULL;
+}
+
+void *client_thread_write_unsignaled(void *arg) {
+    return NULL;
+}
+
+void *client_thread_write_imm(void *arg) {
+    return NULL;
+}
+
+void *client_thread_send(void *arg)
 {
     int    ret = 0, n = 0, i = 0, j = 0;
     long   thread_id        = (long) arg;
@@ -176,6 +188,7 @@ int run_client ()
     pthread_t	   *client_threads = NULL;
     pthread_attr_t  attr;
     void	   *status;
+    void *(*client_thread_func)(void *) = NULL;
 
     log (LOG_SUB_HEADER, "Run Client");
     
@@ -185,6 +198,18 @@ int run_client ()
 
     client_threads = (pthread_t *) calloc (num_threads, sizeof(pthread_t));
     check(client_threads != NULL, "Failed to allocate client_threads.");
+
+    if (benchmark_type == SEND) {
+        client_thread_func = client_thread_send;
+    } else if (benchmark_type == WRITE_SIGNALED) {
+        client_thread_func = client_thread_write_signaled;
+    } else if (benchmark_type == WRITE_UNSIGNALED) {
+        client_thread_func = client_thread_write_unsignaled;
+    } else if (benchmark_type == WRITE_IMM) {
+        client_thread_func = client_thread_write_imm;
+    } else {
+        log_err("The benchmark_type is illegal, %d", benchmark_type);
+    }
 
     for (i = 0; i < num_threads; i++) {
         ret = pthread_create (&client_threads[i], &attr, 

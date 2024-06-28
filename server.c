@@ -9,7 +9,19 @@
 #include "config.h"
 #include "server.h"
 
-void *server_thread (void *arg)
+void *server_thread_write_signaled(void *arg) {
+    return NULL;
+}
+
+void *server_thread_write_unsignaled(void *arg) {
+    return NULL;
+}
+
+void *server_thread_write_imm(void *arg) {
+    return NULL;
+}
+
+void *server_thread_send (void *arg)
 {
     int         ret              = 0, i = 0, j = 0, n = 0;
     long        thread_id        = (long) arg;
@@ -174,6 +186,7 @@ int run_server ()
 
     pthread_t           *threads = NULL;
     pthread_attr_t       attr;
+    void *(*server_thread_func)(void *) = NULL;
     void                *status;
 
     pthread_attr_init (&attr);
@@ -182,8 +195,20 @@ int run_server ()
     threads = (pthread_t *) calloc (num_threads, sizeof(pthread_t));
     check(threads != NULL, "Failed to allocate threads.");
 
+    if (benchmark_type == SEND) {
+        server_thread_func = server_thread_send;
+    } else if (benchmark_type == WRITE_SIGNALED) {
+        server_thread_func = server_thread_write_signaled;
+    } else if (benchmark_type == WRITE_UNSIGNALED) {
+        server_thread_func = server_thread_write_unsignaled;
+    } else if (benchmark_type == WRITE_IMM) {
+        server_thread_func = server_thread_write_imm;
+    } else {
+        log_err("The benchmark_type is illegal, %d", benchmark_type);
+    }
+
     for (i = 0; i < num_threads; i++) {
-        ret = pthread_create (&threads[i], &attr, server_thread, (void *)i);
+        ret = pthread_create (&threads[i], &attr, server_thread_func, (void *)i);
         check(ret == 0, "Failed to create server_thread[%ld]", i);
     }
 

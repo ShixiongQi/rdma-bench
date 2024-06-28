@@ -9,6 +9,8 @@
 
 struct ConfigInfo config_info;
 
+int benchmark_type = 0;
+
 /* remove space, tab and line return from the line */
 void clean_up_line (char *line)
 {
@@ -140,6 +142,9 @@ int parse_config_file (char *fname)
         } else if (strstr (line, "num_concurr_msgs:")) {
             attr = ATTR_NUM_CONCURR_MSGS;
             continue;
+        } else if (strstr (line, "benchmark_type:")) {
+            attr = ATTR_BENCHMARK_TYPE;
+            continue;
         }
 
         if (attr == ATTR_SERVERS) {
@@ -160,6 +165,8 @@ int parse_config_file (char *fname)
             check(config_info.num_concurr_msgs > 0,
                    "Invalid Value: num_concurr_msgs = %d",
                    config_info.num_concurr_msgs);
+        } else if (attr == ATTR_BENCHMARK_TYPE) {
+            benchmark_type = atoi(line);
         }
 
         attr = 0;

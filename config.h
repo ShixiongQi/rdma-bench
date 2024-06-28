@@ -11,6 +11,14 @@ enum ConfigFileAttr {
     ATTR_CLIENTS,
     ATTR_MSG_SIZE,
     ATTR_NUM_CONCURR_MSGS,
+    ATTR_BENCHMARK_TYPE,
+};
+
+enum BenchMarkType {
+    SEND = 1,
+    WRITE_SIGNALED,
+    WRITE_UNSIGNALED,
+    WRITE_IMM,
 };
 
 struct ConfigInfo {
@@ -38,6 +46,8 @@ struct ConfigInfo {
 }__attribute__((aligned(64)));
 
 extern struct ConfigInfo config_info;
+
+extern int benchmark_type;
 
 int  parse_config_file   (char *fname);
 void destroy_config_info ();
