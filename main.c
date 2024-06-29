@@ -3,7 +3,7 @@
 #include <rte_branch_prediction.h>
 #include <rte_eal.h>
 #include <rte_errno.h>
-
+#include <libconfig.h>
 #include "debug.h"
 #include "config.h"
 #include "ib.h"
@@ -34,7 +34,7 @@ int main (int argc, char *argv[])
 
     if (argc != 6) {
 #ifdef USE_RTE_MEMPOOL
-        printf("Usage: %s l 0 --file-prefix=$UNIQUE_NAME --proc-type=primary --no-telemetry --no-pci -- config_file sock_port is_server | is_client dev_index sgid_index\n", argv[0]);
+        printf("Usage: %s -l 0 --file-prefix=$UNIQUE_NAME --proc-type=primary --no-telemetry --no-pci -- config_file sock_port is_server | is_client dev_index sgid_index\n", argv[0]);
 #else
         printf("Usage: %s config_file sock_port is_server | is_client dev_index sgid_index\n", argv[0]);
 #endif

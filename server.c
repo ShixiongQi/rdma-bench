@@ -204,7 +204,7 @@ int run_server ()
     } else if (benchmark_type == WRITE_IMM) {
         server_thread_func = server_thread_write_imm;
     } else {
-        log_err("The benchmark_type is illegal, %d", benchmark_type);
+        log_error("The benchmark_type is illegal, %d", benchmark_type);
     }
 
     for (i = 0; i < num_threads; i++) {
