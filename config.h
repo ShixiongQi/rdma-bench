@@ -68,11 +68,10 @@ struct ConfigInfo {
 
 extern struct ConfigInfo config_info;
 
-extern int benchmark_type;
-
 int  parse_config_file   (char *fname);
 void destroy_config_info ();
-
+int parse_benchmark_cfg (char *cfg_file, struct ConfigInfo *config);
+void print_benchmark_cfg (struct ConfigInfo *config);
 void print_config_info ();
 
 #endif /* CONFIG_H_*/

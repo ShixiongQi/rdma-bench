@@ -12,24 +12,39 @@ LDLIBS = $(shell pkg-config --libs-only-l libconfig libdpdk)
 
 CC=gcc
 CFLAGS += -Wall -Werror -Wno-stringop-truncation -O3
-INCLUDES=
+INCLUDES = -I. -I./test/unity
 LDFLAGS += -libverbs
 LIBS=-pthread
 
-SRCS=main.c client.c config.c ib.c server.c setup_ib.c sock.c
-OBJS=$(SRCS:.c=.o)
-PROG=rdma-tutorial
+# SRCS=main.c client.c config.c ib.c server.c setup_ib.c sock.c
+
+TEST_DIR=test
+UNITY_DIR=test/unity
+
+SRC_FILES = $(wildcard *.c)
+TEST_FILES = $(wildcard $(TEST_DIR)/*.c)
+UNITY_FILES = $(UNITY_DIR)/unity.c
+
+SRC_OBJS=$(SRC_FILES:.c=.o)
+TEST_OBJS=$(TEST_FILES:.c=.o) $(UNITY_FILES:.c=.o)
+
+PROG=rdma-bench
+TEST_EXEC=$(patsubst $(TEST_DIR)/%.c,%,$(TEST_FILES))
 
 all: $(PROG)
 
 debug: CFLAGS=-Wall -Werror -g -DDEBUG
 debug: $(PROG)
 
-.c.o:
+%.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
-$(PROG): $(OBJS)
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(OBJS) $(LDFLAGS) $(LIBS) $(LDLIBS)
+$(PROG): $(SRC_OBJS)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(SRC_OBJS) $(LDFLAGS) $(LIBS) $(LDLIBS)
 
+# test_config: $(TEST_OBJS) 
+# 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(TEST_OBJS) config.o $(LDFLAGS) $(LIBS) $(LDLIBS)
+
+.PHONY: clean
 clean:
-	$(RM) *.o *~ $(PROG)
+	$(RM) *.o $(TEST_DIR)/*.o $(UNITY_DIR)/*.o *~ $(PROG)

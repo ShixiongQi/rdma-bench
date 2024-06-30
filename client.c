@@ -189,6 +189,7 @@ int run_client ()
     pthread_attr_t  attr;
     void	   *status;
     void *(*client_thread_func)(void *) = NULL;
+    int benchmark_type = config_info.benchmark_type;
 
     log (LOG_SUB_HEADER, "Run Client");
     

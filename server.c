@@ -187,7 +187,9 @@ int run_server ()
     pthread_t           *threads = NULL;
     pthread_attr_t       attr;
     void *(*server_thread_func)(void *) = NULL;
+    int benchmark_type = config_info.benchmark_type;
     void                *status;
+
 
     pthread_attr_init (&attr);
     pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);

@@ -9,7 +9,6 @@
 
 struct ConfigInfo config_info;
 
-int benchmark_type = 0;
 
 /* remove space, tab and line return from the line */
 void clean_up_line (char *line)
@@ -91,6 +90,8 @@ int get_rank () {
 
     strncpy (hostname, utsname_buf.nodename, sizeof(hostname));
 
+    log_debug("local hostname: %s", hostname);
+
     config_info.rank = -1;
     for (i = 0; i < num_servers; i++) {
         if (strstr(hostname, config_info.servers[i])) {
@@ -111,7 +112,48 @@ int get_rank () {
  error:
     return -1;
 }
-int parse_benchmark_cfg (char *cfg_file) {
+
+void print_benchmark_cfg (struct ConfigInfo *config) {
+
+    printf("num_servers: %d\n", config->num_servers);
+    printf("num_clients: %d\n", config->num_clients);
+
+    printf("Servers:\n");
+    for (int i = 0; i < config->num_servers; i++) {
+        printf("  %s\n", config->servers[i]);
+    }
+
+    printf("Clients:\n");
+    for (int i = 0; i < config->num_clients; i++) {
+        printf("  %s\n", config->clients[i]);
+    }
+
+    printf("self_sockfd: %d\n", config->self_sockfd);
+
+    printf("is_server: %s\n", config->is_server ? "true" : "false");
+    printf("is_client: %s\n", config->is_client ? "true" : "false");
+    printf("rank: %d\n", config->rank);
+    printf("name: %s\n", config->name);
+    printf("msg_size: %d\n", config->msg_size);
+    printf("num_concurr_msgs: %d\n", config->num_concurr_msgs);
+    printf("n_nodes: %d\n", config->n_nodes);
+
+    printf("Nodes:\n");
+    for (int i = 0; i < config->n_nodes; i++) {
+        printf("  Node %d:\n", i);
+        printf("    id: %d\n", config->nodes[i].id);
+        printf("    hostname: %s\n", config->nodes[i].hostname);
+        printf("    n_peers: %d\n", config->nodes[i].n_peers);
+        printf("    peers:\n");
+        for (int j = 0; j < config->nodes[i].n_peers; j++) {
+            printf("      %d\n", config->nodes[i].peers[j]);
+        }
+    }
+
+    printf("current_node_idx: %d\n", config->current_node_idx);
+}
+
+int parse_benchmark_cfg (char *cfg_file, struct ConfigInfo *config_info) {
     config_t config;
     int ret = 0;
     char hostname[MAX_HOSTNAME_LEN];
@@ -140,15 +182,15 @@ int parse_benchmark_cfg (char *cfg_file) {
         goto error_1;
     }
 
-    strcpy(config_info.name, name);
+    strcpy(config_info->name, name);
 
-    ret = config_lookup_int(&config, "num_concurr_msgs", &config_info.num_concurr_msgs);
+    ret = config_lookup_int(&config, "num_concurr_msgs", &config_info->num_concurr_msgs);
     if (unlikely(ret == CONFIG_FALSE)) {
         log_error("parse_benchmark_cfg() error: ");
         goto error_1;
     }
 
-    ret = config_lookup_int(&config, "msg_size", &config_info.msg_size);
+    ret = config_lookup_int(&config, "msg_size", &config_info->msg_size);
     if (unlikely(ret == CONFIG_FALSE)) {
         log_error("parse_benchmark_cfg() error: ");
         goto error_1;
@@ -164,12 +206,12 @@ int parse_benchmark_cfg (char *cfg_file) {
         goto error_1;
     }
 
-    config_info.n_nodes = config_setting_length(nodes);
+    config_info->n_nodes = config_setting_length(nodes);
 
-    for(int i = 0; i < config_info.n_nodes; i++) {
+    for(int i = 0; i < config_info->n_nodes; i++) {
         node = config_setting_get_elem(nodes, i);
         // Get the node id
-        ret = config_setting_lookup_int(node, "id", &config_info.nodes[i].id);
+        ret = config_setting_lookup_int(node, "id", &config_info->nodes[i].id);
         if (unlikely(ret == CONFIG_FALSE)) {
             goto error_1;
         }
@@ -178,9 +220,9 @@ int parse_benchmark_cfg (char *cfg_file) {
         if (unlikely(ret == CONFIG_FALSE)) {
             goto error_1;
         }
-        strcpy(config_info.nodes[i].hostname, node_hostname);
-        if (strcmp(hostname, config_info.nodes[i].hostname) == 0) {
-            config_info.current_node_idx = i;
+        strcpy(config_info->nodes[i].hostname, node_hostname);
+        if (strcmp(hostname, config_info->nodes[i].hostname) == 0) {
+            config_info->current_node_idx = i;
             is_hostname_matched = 1;
             log_info("Hostnames match: %s, node index: %u", node_hostname, i);
         } else {
@@ -198,10 +240,10 @@ int parse_benchmark_cfg (char *cfg_file) {
             goto error_1;
         }
 
-        config_info.nodes[i].n_peers = config_setting_length(peers);
+        config_info->nodes[i].n_peers = config_setting_length(peers);
 
-        for (int j = 0; j < config_info.nodes[i].n_peers; j++) {
-            config_info.nodes[i].peers[j] = config_setting_get_int_elem(peers, j);
+        for (int j = 0; j < config_info->nodes[i].n_peers; j++) {
+            config_info->nodes[i].peers[j] = config_setting_get_int_elem(peers, j);
         }
     }
     if(unlikely(!is_hostname_matched)) {
@@ -209,13 +251,11 @@ int parse_benchmark_cfg (char *cfg_file) {
         goto error_1;
     }
 
-    ret = config_lookup_int(&config, "benchmark_type", &benchmark_type);
+    ret = config_lookup_int(&config, "benchmark_type", &config_info->benchmark_type);
     if (unlikely(ret == CONFIG_FALSE)) {
         log_error("parse_benchmark_cfg() error: ");
         goto error_1;
     }
-
-    config_info.benchmark_type = benchmark_type;
 
     return 0;
 
@@ -279,7 +319,8 @@ int parse_config_file (char *fname)
                    "Invalid Value: num_concurr_msgs = %d",
                    config_info.num_concurr_msgs);
         } else if (attr == ATTR_BENCHMARK_TYPE) {
-            benchmark_type = atoi(line);
+            config_info.benchmark_type = atoi(line);
+            log_debug("benchmark_type: %d", config_info.benchmark_type);
         }
 
         attr = 0;
