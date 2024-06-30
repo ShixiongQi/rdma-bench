@@ -26,15 +26,16 @@ TEST_FILES = $(wildcard $(TEST_DIR)/*.c)
 UNITY_FILES = $(UNITY_DIR)/unity.c
 
 SRC_OBJS=$(SRC_FILES:.c=.o)
-TEST_OBJS=$(TEST_FILES:.c=.o) $(UNITY_FILES:.c=.o)
+TEST_OBJS=$(TEST_FILES:.c=.o)
+UNITY_OBJS=$(UNITY_FILES:.c=.o)
 
 PROG=rdma-bench
 TEST_EXEC=$(patsubst $(TEST_DIR)/%.c,%,$(TEST_FILES))
 
-all: $(PROG)
+all: $(PROG) $(TEST_EXEC)
 
-debug: CFLAGS=-Wall -Werror -g -DDEBUG
-debug: $(PROG)
+debug: CFLAGS +=-g -DDEBUG
+debug: all
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
@@ -42,9 +43,9 @@ debug: $(PROG)
 $(PROG): $(SRC_OBJS)
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(SRC_OBJS) $(LDFLAGS) $(LIBS) $(LDLIBS)
 
-# test_config: $(TEST_OBJS) 
-# 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(TEST_OBJS) config.o $(LDFLAGS) $(LIBS) $(LDLIBS)
+$(TEST_EXEC): $(filter-out main.o, $(SRC_OBJS)) $(TEST_OBJS) $(UNITY_OBJS)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) $(LIBS) $(LDLIBS)
 
 .PHONY: clean
 clean:
-	$(RM) *.o $(TEST_DIR)/*.o $(UNITY_DIR)/*.o *~ $(PROG)
+	$(RM) *.o $(TEST_DIR)/*.o $(UNITY_DIR)/*.o *~ $(PROG) $(TEST_EXEC)

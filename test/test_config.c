@@ -6,6 +6,8 @@
 
 struct ConfigInfo config_info;
 
+FILE *log_fp = NULL;
+
 void setUp(void) {}
 
 void tearDown(void) {}

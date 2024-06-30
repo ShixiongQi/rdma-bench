@@ -12,7 +12,7 @@
 #define LOG_HEADER     "\n================ %s ================\n"
 #define LOG_SUB_HEADER "\n************ %s ************\n"
 
-extern FILE *log_fp;
+FILE *log_fp;
 
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 

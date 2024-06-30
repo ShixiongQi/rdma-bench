@@ -151,6 +151,7 @@ void print_benchmark_cfg (struct ConfigInfo *config) {
     }
 
     printf("current_node_idx: %d\n", config->current_node_idx);
+    printf("benchmark_type: %d\n", config->benchmark_type);
 }
 
 int parse_benchmark_cfg (char *cfg_file, struct ConfigInfo *config_info) {
@@ -169,6 +170,7 @@ int parse_benchmark_cfg (char *cfg_file, struct ConfigInfo *config_info) {
         goto error_1;
     }
 
+    config_init(&config);
     ret = config_read_file(&config, cfg_file);
     if (unlikely(ret == CONFIG_FALSE)) {
         log_error("parse_benchmark_cfg() error: line %d: %s",
@@ -224,7 +226,7 @@ int parse_benchmark_cfg (char *cfg_file, struct ConfigInfo *config_info) {
         if (strcmp(hostname, config_info->nodes[i].hostname) == 0) {
             config_info->current_node_idx = i;
             is_hostname_matched = 1;
-            log_info("Hostnames match: %s, node index: %u", node_hostname, i);
+            log_debug("Hostnames match: %s, node index: %u", node_hostname, i);
         } else {
             log_debug("Hostnames do not match. Got: %s, Expected: %s", node_hostname, hostname);
         }
@@ -256,11 +258,11 @@ int parse_benchmark_cfg (char *cfg_file, struct ConfigInfo *config_info) {
         log_error("parse_benchmark_cfg() error: ");
         goto error_1;
     }
-
+    
+    config_destroy(&config);
     return 0;
 
 error_1:
-    config_destroy(&config);
     return -1;
 
 }

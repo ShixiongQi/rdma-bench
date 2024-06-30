@@ -11,7 +11,7 @@
 #include "client.h"
 #include "server.h"
 
-FILE *log_fp = NULL;
+extern FILE *log_fp;
 
 int  init_env    ();
 void destroy_env ();
