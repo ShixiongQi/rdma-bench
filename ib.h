@@ -15,6 +15,7 @@
 #define NUM_WARMING_UP_OPS      5000
 #define TOT_NUM_OPS             10000000
 #define SIG_INTERVAL            1000
+#define NUM_WC 20
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 static inline uint64_t htonll (uint64_t x) {return bswap_64(x); }

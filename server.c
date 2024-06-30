@@ -10,7 +10,63 @@
 #include "server.h"
 
 void *server_thread_write_signaled(void *arg) {
-    return NULL;
+    int    ret = 0;
+    long   thread_id        = (long) arg;
+    int    msg_size         = config_info.msg_size;
+    int    num_concurr_msgs = config_info.num_concurr_msgs;
+    int    num_peers        = ib_res.num_qps;
+
+    struct ibv_qp  **qp   = ib_res.qp;
+    struct ibv_cq  *cq    = ib_res.cq;
+    struct ibv_srq *srq   = ib_res.srq;
+    struct ibv_wc  *wc    = NULL;
+    uint32_t       lkey   = ib_res.mr->lkey;
+
+    char   *buf_ptr   = ib_res.ib_buf;
+    char   *buf_base  = ib_res.ib_buf;
+    int    buf_offset = 0;
+    size_t buf_size   = ib_res.ib_buf_size;
+    
+    
+    uint32_t       imm_data        = 0;
+
+    wc = (struct ibv_wc *) calloc (NUM_WC, sizeof(struct ibv_wc));
+    check(wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
+
+    for (int i = 0; i < num_peers; i++) {
+        for (int j = 0; j < num_concurr_msgs; j++) {
+            ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
+            buf_offset = (buf_offset + msg_size) % buf_size;
+            buf_ptr = buf_base + buf_offset;
+        }
+    }
+
+    /* signal the client to start */
+    printf("signal the client to start...\n");
+
+    for (int i = 0; i < num_peers; i++) {
+        ret = post_send (0, lkey, 0, MSG_CTL_START, qp[i], buf_base);
+        check(ret == 0, "thread[%ld]: failed to signal the client to start", thread_id);
+    }
+
+    while (true) {
+        int num_completion = ibv_poll_cq(cq, 1, wc);
+        if (unlikely( num_completion < 0 )) {
+            log_error("failed to poll cq");
+            goto error;
+        }
+        if (!num_completion) {
+            continue;
+        }
+        assert(num_completion);
+        imm_data = ntohl(wc[1].imm_data);
+        if (imm_data == MSG_CTL_STOP) {
+            break;
+        }
+    }
+    pthread_exit((void*)0);
+error:
+    pthread_exit((void*)-1);
 }
 
 void *server_thread_write_unsignaled(void *arg) {
@@ -32,7 +88,6 @@ void *server_thread_send (void *arg)
     pthread_t   self;
     cpu_set_t   cpuset;
 
-    int               num_wc  = 20;
     struct ibv_qp     **qp    = ib_res.qp;
     struct ibv_cq     *cq     = ib_res.cq;
     struct ibv_srq    *srq    = ib_res.srq;
@@ -52,7 +107,7 @@ void *server_thread_send (void *arg)
     double              duration        = 0.0;
     double              throughput      = 0.0;
 
-    wc = (struct ibv_wc *) calloc (num_wc, sizeof(struct ibv_wc));
+    wc = (struct ibv_wc *) calloc (NUM_WC, sizeof(struct ibv_wc));
     check(wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
 
     /* set thread affinity */
@@ -63,7 +118,7 @@ void *server_thread_send (void *arg)
     check(ret == 0, "thread[%ld]: failed to set thread affinity", thread_id);
 
     /* pre-post recvs */
-    wc = (struct ibv_wc *) calloc (num_wc, sizeof(struct ibv_wc));
+    wc = (struct ibv_wc *) calloc (NUM_WC, sizeof(struct ibv_wc));
     check(wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
 
     for (i = 0; i < num_peers; i++) {
@@ -84,7 +139,7 @@ void *server_thread_send (void *arg)
 
     while (stop != true) {
         /* poll cq */
-        n = ibv_poll_cq (cq, num_wc, wc);
+        n = ibv_poll_cq (cq, NUM_WC, wc);
         if (n < 0) {
             check(0, "thread[%ld]: Failed to poll cq", thread_id);
         }
@@ -133,7 +188,7 @@ void *server_thread_send (void *arg)
     stop = false;
     while (stop != true) {
         /* poll cq */
-        n = ibv_poll_cq (cq, num_wc, wc);
+        n = ibv_poll_cq (cq, NUM_WC, wc);
         if (n < 0) {
             check(0, "thread[%ld]: Failed to poll cq", thread_id);
         }

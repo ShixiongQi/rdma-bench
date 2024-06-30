@@ -5,6 +5,7 @@
 #include <inttypes.h>
 #include <libconfig.h>
 #include <rte_branch_prediction.h>
+#include <assert.h>
 
 #define USE_RTE_MEMPOOL 1
 
