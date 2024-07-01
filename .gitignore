@@ -44,3 +44,4 @@ cfg/*.bak
 
 # compile files
 compile_commands.json
+.cache/

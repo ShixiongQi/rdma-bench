@@ -36,17 +36,27 @@ TEST_EXEC=$(patsubst $(TEST_DIR)/%.c,$(BIN_DIR)/%,$(TEST_FILES))
 all: $(PROG) $(TEST_EXEC)
 
 debug: CFLAGS +=-g -DDEBUG
-debug: all
+debug: clean
+	@if command -v bear >/dev/null 2>&1; then \
+		echo "Bear is installed, generating compile_commands.json"; \
+		bear make all; \
+	else \
+		echo "Bear is not installed, skipping generation of compile_commands.json"; \
+		make all; \
+	fi
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
 $(PROG): $(SRC_OBJS)
+	@mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(SRC_OBJS) $(LDFLAGS) $(LIBS) $(LDLIBS)
 
 $(TEST_EXEC): $(filter-out main.o, $(SRC_OBJS)) $(TEST_OBJS) $(UNITY_OBJS)
+	@mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) $(LIBS) $(LDLIBS)
+
 
 .PHONY: clean
 clean:
-	$(RM) *.o $(TEST_DIR)/*.o $(UNITY_DIR)/*.o *~ $(PROG) $(TEST_EXEC) $(BIN_DIR)/*
+	$(RM) *.o $(TEST_DIR)/*.o $(UNITY_DIR)/*.o *~ $(PROG) $(BIN_DIR)/* compile_commands.json
