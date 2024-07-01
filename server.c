@@ -10,11 +10,11 @@
 #include "server.h"
 
 void *server_thread_write_signaled(void *arg) {
+    assert( ib_res.num_qps == 1);
     int    ret = 0;
     long   thread_id        = (long) arg;
     int    msg_size         = config_info.msg_size;
     int    num_concurr_msgs = config_info.num_concurr_msgs;
-    int    num_peers        = ib_res.num_qps;
 
     struct ibv_qp  **qp   = ib_res.qp;
     struct ibv_cq  *cq    = ib_res.cq;
@@ -27,45 +27,57 @@ void *server_thread_write_signaled(void *arg) {
     int    buf_offset = 0;
     size_t buf_size   = ib_res.ib_buf_size;
     
-    
-    uint32_t       imm_data        = 0;
+
+    int num_completion = 0;
 
     wc = (struct ibv_wc *) calloc (NUM_WC, sizeof(struct ibv_wc));
     check(wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
 
-    for (int i = 0; i < num_peers; i++) {
-        for (int j = 0; j < num_concurr_msgs; j++) {
-            ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
-            buf_offset = (buf_offset + msg_size) % buf_size;
-            buf_ptr = buf_base + buf_offset;
+    for (int j = 0; j < num_concurr_msgs; j++) {
+        ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
+        if (unlikely(ret == 0)) {
+            log_error("post fail");
+            goto error;
         }
+        buf_offset = (buf_offset + msg_size) % buf_size;
+        buf_ptr = buf_base + buf_offset;
     }
 
     /* signal the client to start */
     printf("signal the client to start...\n");
 
-    for (int i = 0; i < num_peers; i++) {
-        ret = post_send (0, lkey, 0, MSG_CTL_START, qp[i], buf_base);
-        check(ret == 0, "thread[%ld]: failed to signal the client to start", thread_id);
+    ret = post_send (0, lkey, 0, MSG_CTL_START, qp[0], buf_base);
+    if (unlikely(ret == 0)) {
+        log_error("post start fail");
+        goto error;
     }
+    // TODO add comfirmation of start
 
-    while (true) {
-        int num_completion = ibv_poll_cq(cq, 1, wc);
+    bool finish = false;
+    while (!finish) {
+        num_completion = ibv_poll_cq(cq, NUM_WC, wc);
         if (unlikely( num_completion < 0 )) {
             log_error("failed to poll cq");
             goto error;
         }
-        if (!num_completion) {
-            continue;
-        }
-        assert(num_completion);
-        imm_data = ntohl(wc[1].imm_data);
-        if (imm_data == MSG_CTL_STOP) {
-            break;
+        for (int i = 0; i < num_completion; i++) {
+            if (wc[i].status != IBV_WC_SUCCESS) {
+                log_error("wc failed status: %s.", ibv_wc_status_str(wc[i].status));
+                goto error;
+            }
+            if (wc[i].opcode == IBV_WC_RECV) {
+                /* post a receive */
+                post_srq_recv (msg_size, lkey, wc[i].wr_id, srq, buf_base);
+                if ((wc[i].wc_flags & IBV_WC_WITH_IMM) && (ntohl(wc[i].imm_data) == MSG_CTL_STOP )) {
+                    finish = true;
+                }
+            }
         }
     }
+    free(wc);
     pthread_exit((void*)0);
 error:
+    free(wc);
     pthread_exit((void*)-1);
 }
 
@@ -74,11 +86,11 @@ void *server_thread_write_unsignaled(void *arg) {
 }
 
 void *server_thread_write_imm(void *arg) {
+    assert( ib_res.num_qps == 1);
     int    ret = 0;
     long   thread_id        = (long) arg;
     int    msg_size         = config_info.msg_size;
     int    num_concurr_msgs = config_info.num_concurr_msgs;
-    int    num_peers        = ib_res.num_qps;
 
     struct ibv_qp  **qp   = ib_res.qp;
     struct ibv_cq  *cq    = ib_res.cq;
@@ -96,38 +108,36 @@ void *server_thread_write_imm(void *arg) {
     double         duration        = 0.0;
     double         throughput      = 0.0;
 
-    int num_completions = 0;
+    int num_completion = 0;
 
     wc = (struct ibv_wc *) calloc (NUM_WC, sizeof(struct ibv_wc));
     check(wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
 
-    for (int i = 0; i < num_peers; i++) {
-        for (int j = 0; j < num_concurr_msgs; j++) {
-            ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
-            buf_offset = (buf_offset + msg_size) % buf_size;
-            buf_ptr = buf_base + buf_offset;
-        }
+    for (int j = 0; j < num_concurr_msgs; j++) {
+        ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
+        buf_offset = (buf_offset + msg_size) % buf_size;
+        buf_ptr = buf_base + buf_offset;
     }
 
     /* signal the client to start */
     printf("signal the client to start...\n");
 
-    for (int i = 0; i < num_peers; i++) {
-        ret = post_send (0, lkey, 0, MSG_CTL_START, qp[i], buf_base);
-        check(ret == 0, "thread[%ld]: failed to signal the client to start", thread_id);
-    }
-    long int ops_count = 0;
-    while (1) {
-        while ((num_completions = ibv_poll_cq(cq, NUM_WC, wc)) == 0) {}
+    ret = post_send (0, lkey, 0, MSG_CTL_START, qp[0], buf_base);
+    check(ret == 0, "thread[%ld]: failed to signal the client to start", thread_id);
 
-        if (num_completions < 0) {
-            log_error("Failed to poll CQ");
+    long int ops_count = 0;
+    bool stop = false;
+    while (!stop) {
+        while ((num_completion = ibv_poll_cq(cq, NUM_WC, wc)) == 0) {}
+
+        if (unlikely( num_completion < 0 )) {
+            log_error("failed to poll cq");
             goto error;
         }
 
-        for (int i = 0; i < num_completions; i++) {
+        for (int i = 0; i < num_completion; i++) {
             if (wc[i].status != IBV_WC_SUCCESS) {
-                log_error("QP event not success");
+                log_error("wc failed status: %s.", ibv_wc_status_str(wc[i].status));
                 goto error;
             }
 
@@ -139,30 +149,28 @@ void *server_thread_write_imm(void *arg) {
                 }
                 if (ops_count == TOT_NUM_OPS) {
                     gettimeofday(&end, NULL);
-                    break;
+                    stop = true;
                 }
             }
         }
     }
 
-    for (int i = 0; i < num_peers; i++) {
-        ret = post_send (0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[i], ib_res.ib_buf);
-        check(ret == 0, "thread[%ld]: failed to signal the client to stop", thread_id);
-    }
+    ret = post_send (0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[0], ib_res.ib_buf);
+    check(ret == 0, "thread[%ld]: failed to signal the client to stop", thread_id);
 
-    bool stop = false;
 
     
-    while (stop != true) {
+    stop = false;
+    while (!stop) {
         /* poll cq */
-        num_completions  = ibv_poll_cq (cq, NUM_WC, wc);
-        if (num_completions < 0) {
-            log_error("Failed to poll CQ");
+        num_completion  = ibv_poll_cq (cq, NUM_WC, wc);
+        if (unlikely( num_completion < 0 )) {
+            log_error("failed to poll cq");
             goto error;
         }
-        for (int i = 0; i < num_completions; i++) {
+        for (int i = 0; i < num_completion; i++) {
             if (wc[i].status != IBV_WC_SUCCESS) {
-                log_error("QP event not success");
+                log_error("wc failed status: %s.", ibv_wc_status_str(wc[i].status));
                 goto error;
             }
             if (wc[i].opcode == IBV_WC_SEND) {
@@ -184,7 +192,6 @@ void *server_thread_write_imm(void *arg) {
     pthread_exit((void*)0);
 error:
     free (wc);
-    // tell client to stop
     pthread_exit((void*)-1);
 }
 

@@ -31,7 +31,7 @@ void print_qp_info(struct QPInfo *qp_info) {
     printf("LID: %u\n", qp_info->lid);
     printf("QP Number: %u\n", qp_info->qp_num);
     printf("Rank: %u\n", qp_info->rank);
-    printf("GID Index: %u\n", qp_info->gid_index);
+    printf("GID Index: %u\n", qp_info->sgid_index);
     print_ibv_gid(qp_info->gid);
 }
 
@@ -64,8 +64,11 @@ int connect_qp_server() {
         local_qp_info[i].lid       = ib_res.port_attr.lid; 
         local_qp_info[i].qp_num    = ib_res.qp[i]->qp_num;
         local_qp_info[i].rank      = config_info.rank;
-        local_qp_info[i].gid_index = config_info.sgid_index;
+        local_qp_info[i].sgid_index = config_info.sgid_index;
         local_qp_info[i].gid       = ib_res.sgid;
+        local_qp_info[i].rkey = ib_res.mr->rkey;
+        local_qp_info[i].raddr = (uint64_t)ib_res.mr->addr;
+        local_qp_info[i].rsize = ib_res.mr->length;
     }
 
     /* get qp_info from client */
@@ -76,6 +79,11 @@ int connect_qp_server() {
         ret = sock_get_qp_info (config_info.peer_sockfds[i], &remote_qp_info[i]);
         check(ret == 0, "Failed to get qp_info from client[%d]", i);
     }
+    // TODO temporary setting for one server one client benchmark
+    assert(num_peers == 1);
+    ib_res.raddr = remote_qp_info[0].raddr;
+    ib_res.rkey = remote_qp_info[0].rkey;
+    ib_res.rsize = remote_qp_info[0].rsize;
     
     /* send qp_info to client */
     int peer_ind = -1;
@@ -172,8 +180,11 @@ int connect_qp_client() {
         local_qp_info[i].lid       = ib_res.port_attr.lid; 
         local_qp_info[i].qp_num    = ib_res.qp[i]->qp_num; 
         local_qp_info[i].rank      = config_info.rank;
-        local_qp_info[i].gid_index = config_info.sgid_index;
+        local_qp_info[i].sgid_index = config_info.sgid_index;
         local_qp_info[i].gid       = ib_res.sgid;
+        local_qp_info[i].rkey = ib_res.mr->rkey;
+        local_qp_info[i].raddr = (uint64_t)ib_res.mr->addr;
+        local_qp_info[i].rsize = ib_res.mr->length;
     }
 
     /* send qp_info to server */
@@ -191,6 +202,12 @@ int connect_qp_client() {
         check(ret == 0, "Failed to get qp_info[%d] from server", i);
     }
     
+    // TODO temporary setting for one server one client benchmark
+    assert(num_peers == 1);
+    ib_res.raddr = remote_qp_info[0].raddr;
+    ib_res.rkey = remote_qp_info[0].rkey;
+    ib_res.rsize = remote_qp_info[0].rsize;
+
     /* change QP state to RTS */
     /* send qp_info to client */
     int peer_ind = -1;

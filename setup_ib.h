@@ -22,6 +22,7 @@ struct IBRes {
     /* Used for one-sided WRITE */
     uint32_t rkey;
     uint64_t raddr;
+    uint32_t rsize;
 };
 
 extern struct IBRes ib_res;

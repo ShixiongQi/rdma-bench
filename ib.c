@@ -13,7 +13,7 @@ int modify_qp_to_rts (struct ibv_qp *qp, struct QPInfo *local, struct QPInfo *re
     struct ibv_qp_attr qp_attr = {
         .qp_state        = IBV_QPS_INIT,
         .pkey_index      = 0,
-        .port_num        = local->gid_index,
+        .port_num        = local->sgid_index,
         .qp_access_flags = IBV_ACCESS_LOCAL_WRITE |
                            IBV_ACCESS_REMOTE_READ |
                            IBV_ACCESS_REMOTE_ATOMIC |
@@ -39,13 +39,13 @@ int modify_qp_to_rts (struct ibv_qp *qp, struct QPInfo *local, struct QPInfo *re
         .ah_attr.dlid          = remote->lid, // Not used for RoCEv2
         .ah_attr.sl            = IB_SL, // Service level
         .ah_attr.src_path_bits = 0,
-        .ah_attr.port_num      = local->gid_index,
+        .ah_attr.port_num      = local->sgid_index,
     };
 
     if (qp_attr.ah_attr.dlid == 0) {
         printf("Using RoCEv2 transport\n");
         qp_attr.ah_attr.is_global = 1; // grh is valid for RoCEv2
-        qp_attr.ah_attr.grh.sgid_index = local->gid_index - 1;
+        qp_attr.ah_attr.grh.sgid_index = local->sgid_index - 1;
         qp_attr.ah_attr.grh.dgid = remote->gid;
         qp_attr.ah_attr.grh.hop_limit = 0xFF;
         qp_attr.ah_attr.grh.traffic_class = 0;
