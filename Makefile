@@ -20,6 +20,7 @@ LIBS=-pthread
 
 TEST_DIR=test
 UNITY_DIR=test/unity
+BIN_DIR=bin
 
 SRC_FILES = $(wildcard *.c)
 TEST_FILES = $(wildcard $(TEST_DIR)/*.c)
@@ -29,8 +30,8 @@ SRC_OBJS=$(SRC_FILES:.c=.o)
 TEST_OBJS=$(TEST_FILES:.c=.o)
 UNITY_OBJS=$(UNITY_FILES:.c=.o)
 
-PROG=rdma-bench
-TEST_EXEC=$(patsubst $(TEST_DIR)/%.c,%,$(TEST_FILES))
+PROG=$(BIN_DIR)/rdma-bench
+TEST_EXEC=$(patsubst $(TEST_DIR)/%.c,$(BIN_DIR)/%,$(TEST_FILES))
 
 all: $(PROG) $(TEST_EXEC)
 
@@ -48,4 +49,4 @@ $(TEST_EXEC): $(filter-out main.o, $(SRC_OBJS)) $(TEST_OBJS) $(UNITY_OBJS)
 
 .PHONY: clean
 clean:
-	$(RM) *.o $(TEST_DIR)/*.o $(UNITY_DIR)/*.o *~ $(PROG) $(TEST_EXEC)
+	$(RM) *.o $(TEST_DIR)/*.o $(UNITY_DIR)/*.o *~ $(PROG) $(TEST_EXEC) $(BIN_DIR)/*

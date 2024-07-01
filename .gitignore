@@ -27,7 +27,7 @@
 *.i*86
 *.x86_64
 *.hex
-rdma-tutorial
+bin/
 
 # Debug files
 *.dSYM/
@@ -41,3 +41,6 @@ tags
 
 # cfg backup file
 cfg/*.bak
+
+# compile files
+compile_commands.json
