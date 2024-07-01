@@ -35,7 +35,7 @@ void *server_thread_write_signaled(void *arg) {
 
     for (int j = 0; j < num_concurr_msgs; j++) {
         ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
-        if (unlikely(ret == 0)) {
+        if (unlikely(ret != 0)) {
             log_error("post fail");
             goto error;
         }

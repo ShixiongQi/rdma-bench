@@ -44,8 +44,8 @@ void *client_thread_write_signaled(void *arg) {
 
     for (int j = 0; j < num_concurr_msgs; j++) {
         ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
-        if (unlikely(ret == 0)) {
-            log_error("post fail");
+        if (unlikely(ret != 0)) {
+            log_error("post shared receive request fail");
             goto error;
         }
         buf_offset = (buf_offset + msg_size) % buf_size;
@@ -184,8 +184,9 @@ void *client_thread_write_imm(void *arg) {
 
     for (int j = 0; j < num_concurr_msgs; j++) {
         ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
-        if (unlikely(ret == 0)) {
-            log_error("post fail");
+        if (unlikely(ret != 0)) {
+            log_error("post shared receive request fail");
+            goto error;
         }
         buf_offset = (buf_offset + msg_size) % buf_size;
         buf_ptr = buf_base + buf_offset;
@@ -306,6 +307,10 @@ void *client_thread_send(void *arg)
     for (int i = 0; i < num_peers; i++) {
         for (int j = 0; j < num_concurr_msgs; j++) {
             ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
+            if (unlikely(ret != 0)) {
+                log_error("post shared receive request fail");
+                goto error;
+            }
             buf_offset = (buf_offset + msg_size) % buf_size;
             buf_ptr = buf_base + buf_offset;
         }
