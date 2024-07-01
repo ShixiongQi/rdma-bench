@@ -65,7 +65,7 @@ void *client_thread_write_signaled(void *arg) {
             }
             if (wc[i].opcode == IBV_WC_RECV) {
                 /* post a receive */
-                post_srq_recv (msg_size, lkey, wc[i].wr_id, srq, (char *)wc[i].wr_id);
+                post_srq_recv (msg_size, lkey, wc[i].wr_id, srq, buf_base);
                 
                 if (ntohl(wc[i].imm_data) == MSG_CTL_START) {
                     num_acked_peers += 1;
@@ -144,6 +144,111 @@ void *client_thread_write_unsignaled(void *arg) {
 }
 
 void *client_thread_write_imm(void *arg) {
+    int ret = 0;
+    int    n = 0;
+    long   thread_id        = (long) arg;
+    int    msg_size         = config_info.msg_size;
+    int    num_concurr_msgs = config_info.num_concurr_msgs;
+    int    num_peers        = ib_res.num_qps;
+
+
+    struct ibv_qp  **qp   = ib_res.qp;
+    struct ibv_cq  *cq    = ib_res.cq;
+    struct ibv_srq *srq   = ib_res.srq;
+    struct ibv_wc  *wc    = NULL;
+    uint32_t       lkey   = ib_res.mr->lkey;
+
+    char   *buf_ptr   = ib_res.ib_buf;
+    char   *buf_base  = ib_res.ib_buf;
+    int    buf_offset = 0;
+    size_t buf_size   = ib_res.ib_buf_size;
+    int num_completion = 0;
+    
+    
+    int            num_acked_peers = 0;
+
+    wc = (struct ibv_wc *) calloc (NUM_WC, sizeof(struct ibv_wc));
+    check(wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
+
+    for (int i = 0; i < num_peers; i++) {
+        for (int j = 0; j < num_concurr_msgs; j++) {
+            ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
+            if (unlikely(ret == 0)) {
+                log_error("post fail");
+            }
+            buf_offset = (buf_offset + msg_size) % buf_size;
+            buf_ptr = buf_base + buf_offset;
+        }
+    }
+
+    printf("Client thread-[%ld] wait for start signal...\n", thread_id);
+    /* wait for start signal */
+
+    bool start_sending = false;
+    while (!start_sending) {
+        do {
+            n = ibv_poll_cq (cq, NUM_WC, wc);
+        } while (n < 1);
+        for (int i = 0; i < n; i++) {
+            if (wc[i].status != IBV_WC_SUCCESS) {
+                check(0, "thread[%ld]: wc failed status: %s.",
+                       thread_id, ibv_wc_status_str(wc[i].status));
+            }
+            if (wc[i].opcode == IBV_WC_RECV) {
+                /* post a receive */
+                post_srq_recv (msg_size, lkey, 1, srq, buf_base);
+                
+                if ((wc[i].wc_flags & IBV_WC_WITH_IMM) && ntohl(wc[i].imm_data) == MSG_CTL_START) {
+                    num_acked_peers += 1;
+                    if (num_acked_peers == num_peers) {
+                        start_sending = true;
+                    }
+                }
+            }
+        }
+    }
+
+    log ("thread[%ld]: ready to send", thread_id);
+
+    debug ("buf_ptr = %"PRIx64"", (uint64_t)buf_ptr);
+    
+
+    bool keep_sending = true;
+    for (int i = 0; i < num_peers; i++) {
+        while(keep_sending) {
+            buf_offset = 0;
+            ret = post_write_imm_data (msg_size, lkey, 1, *qp, buf_ptr, ib_res.raddr, ib_res.raddr, 0);
+
+            buf_offset = (buf_offset + msg_size) % buf_size;
+            buf_ptr = buf_base + buf_offset;
+
+            num_completion = ibv_poll_cq(cq, NUM_WC, wc);
+            if (unlikely(num_completion < 0)) {
+                log_error("Poll WRITE_SIGNALED completion request fail");
+                goto error;
+            }
+            for (int i = 0; i < num_completion; i++) {
+                if (unlikely(wc[i].status != IBV_WC_SUCCESS)) {
+                    log_error("Poll WRITE_SIGNALED completion request not success");
+                    goto error;
+                }
+                if (wc[i].opcode == IBV_WC_RECV) {
+                    post_srq_recv (msg_size, lkey, wc[i].wr_id, srq, (char *)wc[i].wr_id);
+                    if (ntohl(wc[i].imm_data) == MSG_CTL_STOP) {
+                        num_acked_peers += 1;
+                        if (num_acked_peers == num_peers) {
+                            keep_sending = false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pthread_exit((void*) 0);
+
+error:
+    pthread_exit((void*) -1);
     return NULL;
 }
 
