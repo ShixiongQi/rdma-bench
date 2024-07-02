@@ -1,3 +1,4 @@
+#include <rte_branch_prediction.h>
 #define _GNU_SOURCE
 #include <stdlib.h>
 #include <stdbool.h>
@@ -77,7 +78,7 @@ void *client_thread_write_signaled(void *arg) {
         }
     }
 
-    log ("thread[%ld]: ready to send", thread_id);
+    log_debug ("thread[%ld]: ready to send", thread_id);
 
     buf_offset = 0;
     roffset = 0;
@@ -95,7 +96,7 @@ void *client_thread_write_signaled(void *arg) {
             goto error;
         }
         for (int i = 0; i < num_completion; i++) {
-            if (wc[i].status != IBV_WC_SUCCESS) {
+            if (unlikely( wc[i].status != IBV_WC_SUCCESS )) {
                 log_error("wc failed status: %s.", ibv_wc_status_str(wc[i].status));
                 goto error;
             }
@@ -183,7 +184,7 @@ void *client_thread_write_imm(void *arg) {
     check(wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
 
     for (int j = 0; j < num_concurr_msgs; j++) {
-        ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
+        ret = post_srq_recv (msg_size, lkey, 0, srq, buf_ptr);
         if (unlikely(ret != 0)) {
             log_error("post shared receive request fail");
             goto error;
@@ -196,6 +197,7 @@ void *client_thread_write_imm(void *arg) {
     /* wait for start signal */
 
     int num_completion = 0;
+    stop = false;
     while (!stop) {
         num_completion = ibv_poll_cq (cq, NUM_WC, wc);
         if (unlikely( num_completion < 0 )) {
@@ -203,22 +205,22 @@ void *client_thread_write_imm(void *arg) {
             goto error;
         }
         for (int i = 0; i < num_completion; i++) {
-            if (wc[i].status != IBV_WC_SUCCESS) {
+            if (unlikely( wc[i].status != IBV_WC_SUCCESS )) {
                 log_error("wc failed status: %s.", ibv_wc_status_str(wc[i].status));
                 goto error;
             }
             if (wc[i].opcode == IBV_WC_RECV) {
                 /* post a receive */
-                post_srq_recv (msg_size, lkey, 1, srq, buf_base);
+                post_srq_recv (msg_size, lkey, wc[i].wr_id, srq, buf_base);
                 
-                if ((wc[i].wc_flags & IBV_WC_WITH_IMM) && ntohl(wc[i].imm_data) == MSG_CTL_START) {
+                if ((wc[i].wc_flags & IBV_WC_WITH_IMM) && (ntohl(wc[i].imm_data) == MSG_CTL_START)) {
                     stop = true;
                 }
             }
         }
     }
 
-    log ("thread[%ld]: ready to send", thread_id);
+    log_debug ("thread[%ld]: ready to send", thread_id);
 
     debug ("buf_ptr = %"PRIx64"", (uint64_t)buf_ptr);
     
@@ -227,14 +229,11 @@ void *client_thread_write_imm(void *arg) {
     buf_offset = 0;
     roffset = 0;
     while(!stop) {
-        buf_offset = 0;
         ret = post_write_imm_data (msg_size, lkey, 1, *qp, buf_ptr, rptr, rkey, 0);
-
-        buf_offset = (buf_offset + msg_size) % buf_size;
-        buf_ptr = buf_base + buf_offset;
-
-        roffset = (roffset + msg_size) % rsize;
-        rptr = raddr + roffset;
+        if (unlikely(ret != 0)) {
+            log_error("send write imme_data failed");
+            goto error;
+        }
 
         num_completion = ibv_poll_cq(cq, NUM_WC, wc);
         if (unlikely(num_completion < 0)) {
@@ -247,12 +246,16 @@ void *client_thread_write_imm(void *arg) {
                 goto error;
             }
             if (wc[i].opcode == IBV_WC_RECV) {
-                post_srq_recv (msg_size, lkey, wc[i].wr_id, srq, (char *)wc[i].wr_id);
-                if (ntohl(wc[i].imm_data) == MSG_CTL_STOP) {
+                post_srq_recv (msg_size, lkey, wc[i].wr_id, srq, buf_base);
+                if ((wc[i].wc_flags & IBV_WC_WITH_IMM) && ntohl(wc[i].imm_data) == MSG_CTL_STOP) {
                     stop = true;
                 }
             }
         }
+        buf_offset = (buf_offset + msg_size) % buf_size;
+        buf_ptr = buf_base + buf_offset;
+        roffset = (roffset + msg_size) % rsize;
+        rptr = raddr + roffset;
     }
 
     pthread_exit((void*) 0);
@@ -306,7 +309,7 @@ void *client_thread_send(void *arg)
 
     for (int i = 0; i < num_peers; i++) {
         for (int j = 0; j < num_concurr_msgs; j++) {
-            ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
+            ret = post_srq_recv (msg_size, lkey, 0, srq, buf_ptr);
             if (unlikely(ret != 0)) {
                 log_error("post shared receive request fail");
                 goto error;

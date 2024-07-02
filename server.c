@@ -36,7 +36,7 @@ void *server_thread_write_signaled(void *arg) {
     for (int j = 0; j < num_concurr_msgs; j++) {
         ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
         if (unlikely(ret != 0)) {
-            log_error("post fail");
+            log_error("post shared receive request fail");
             goto error;
         }
         buf_offset = (buf_offset + msg_size) % buf_size;
@@ -47,7 +47,7 @@ void *server_thread_write_signaled(void *arg) {
     printf("signal the client to start...\n");
 
     ret = post_send (0, lkey, 0, MSG_CTL_START, qp[0], buf_base);
-    if (unlikely(ret == 0)) {
+    if (unlikely(ret != 0)) {
         log_error("post start fail");
         goto error;
     }
@@ -104,6 +104,7 @@ void *server_thread_write_imm(void *arg) {
     size_t buf_size   = ib_res.ib_buf_size;
     
 
+    bool stop = false;
     struct timeval start, end;
     double         duration        = 0.0;
     double         throughput      = 0.0;
@@ -115,6 +116,10 @@ void *server_thread_write_imm(void *arg) {
 
     for (int j = 0; j < num_concurr_msgs; j++) {
         ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
+        if (unlikely(ret != 0)) {
+            log_error("post shared receive request fail");
+            goto error;
+        }
         buf_offset = (buf_offset + msg_size) % buf_size;
         buf_ptr = buf_base + buf_offset;
     }
@@ -125,8 +130,10 @@ void *server_thread_write_imm(void *arg) {
     ret = post_send (0, lkey, 0, MSG_CTL_START, qp[0], buf_base);
     check(ret == 0, "thread[%ld]: failed to signal the client to start", thread_id);
 
+    printf("signaled the client to start...\n");
     long int ops_count = 0;
-    bool stop = false;
+
+    stop = false;
     while (!stop) {
         while ((num_completion = ibv_poll_cq(cq, NUM_WC, wc)) == 0) {}
 
@@ -141,9 +148,10 @@ void *server_thread_write_imm(void *arg) {
                 goto error;
             }
 
-            if (wc[i].wc_flags & IBV_WC_WITH_IMM) {
+            if (wc[i].opcode == IBV_WC_RECV_RDMA_WITH_IMM) {
                 /* uint32_t imm_data = ntohl(wc[i].imm_data); */
                 ops_count++;
+                log_error("%ld", ops_count);
                 if (ops_count == NUM_WARMING_UP_OPS) {
                     gettimeofday(&start, NULL);
                 }
@@ -195,8 +203,7 @@ error:
     pthread_exit((void*)-1);
 }
 
-void *server_thread_send (void *arg)
-{
+void *server_thread_send (void *arg) {
     int         ret              = 0, i = 0, j = 0, n = 0;
     long        thread_id        = (long) arg;
     int         num_concurr_msgs = config_info.num_concurr_msgs;
@@ -351,8 +358,7 @@ void *server_thread_send (void *arg)
     pthread_exit ((void *)-1);
 }
 
-int run_server ()
-{
+int run_server () {
     int   ret         = 0;
     long  num_threads = 1;
     long  i           = 0;
