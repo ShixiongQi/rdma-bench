@@ -229,9 +229,10 @@ void *client_thread_write_imm(void *arg) {
     buf_offset = 0;
     roffset = 0;
     while(!stop) {
-        ret = post_write_imm_data (msg_size, lkey, 1, *qp, buf_ptr, rptr, rkey, 0);
+        ret = post_write_imm_data (msg_size, lkey, 0, *qp, buf_ptr, rptr, rkey, 0);
+        log_debug("sent");
         if (unlikely(ret != 0)) {
-            log_error("send write imme_data failed");
+            log_error("send write imme_data failed, error ret: %d", ret);
             goto error;
         }
 
@@ -244,6 +245,9 @@ void *client_thread_write_imm(void *arg) {
             if (unlikely(wc[i].status != IBV_WC_SUCCESS)) {
                 log_error("wc failed status: %s.", ibv_wc_status_str(wc[i].status));
                 goto error;
+            }
+            if (wc[i].opcode == IBV_WC_RDMA_WRITE) {
+                log_debug("get write completion");
             }
             if (wc[i].opcode == IBV_WC_RECV) {
                 post_srq_recv (msg_size, lkey, wc[i].wr_id, srq, buf_base);
