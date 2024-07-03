@@ -1,4 +1,3 @@
-#include <rte_branch_prediction.h>
 #define _GNU_SOURCE
 #include <stdlib.h>
 #include <stdbool.h>
@@ -184,7 +183,7 @@ void *client_thread_write_imm(void *arg) {
     check(wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
 
     for (int j = 0; j < num_concurr_msgs; j++) {
-        ret = post_srq_recv (msg_size, lkey, 0, srq, buf_ptr);
+        ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
         if (unlikely(ret != 0)) {
             log_error("post shared receive request fail");
             goto error;
@@ -313,7 +312,7 @@ void *client_thread_send(void *arg)
 
     for (int i = 0; i < num_peers; i++) {
         for (int j = 0; j < num_concurr_msgs; j++) {
-            ret = post_srq_recv (msg_size, lkey, 0, srq, buf_ptr);
+            ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
             if (unlikely(ret != 0)) {
                 log_error("post shared receive request fail");
                 goto error;
