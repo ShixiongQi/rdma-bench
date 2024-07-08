@@ -46,6 +46,10 @@ enum MsgType {
     MSG_CTL_STOP,
 };
 
+void print_ibv_gid(union ibv_gid gid);
+
+void print_qp_info(struct QPInfo *qp_info);
+
 int modify_qp_to_rts(struct ibv_qp *qp, struct QPInfo *local, struct QPInfo *remote);
 
 int post_send(uint32_t req_size, uint32_t lkey, uint64_t wr_id, 

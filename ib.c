@@ -4,6 +4,34 @@
 #include "ib.h"
 #include "debug.h"
 
+
+void print_ibv_gid(union ibv_gid gid) {
+    printf("Raw GID: ");
+    for (int i = 0; i < 16; ++i) {
+        printf("%02x", gid.raw[i]);
+        if (i % 2 && i != 15) {
+            printf(":");
+        }
+    }
+    printf("\n");
+
+    printf("Subnet Prefix: 0x%" PRIx64 "\n", (uint64_t) gid.global.subnet_prefix);
+    printf("Interface ID: 0x%" PRIx64 "\n", (uint64_t) gid.global.interface_id);
+}
+
+void print_qp_info(struct QPInfo *qp_info) {
+    printf("LID: %u\n", qp_info->lid);
+    printf("QP Number: %u\n", qp_info->qp_num);
+    printf("Rank: %u\n", qp_info->rank);
+    printf("GID Index: %u\n", qp_info->sgid_index);
+    print_ibv_gid(qp_info->gid);
+    printf("ib_port: %u\n", qp_info->ib_port);
+    printf("rkey: %u\n", qp_info->rkey);
+    printf("raddr: %ld\n", qp_info->raddr);
+    printf("rsize: %d\n", qp_info->rsize);
+    printf("psn: %d\n", qp_info->psn);
+}
+
 int modify_qp_to_rts (struct ibv_qp *qp, struct QPInfo *local, struct QPInfo *remote)
 {
     int ret = 0;

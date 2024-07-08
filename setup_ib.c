@@ -14,27 +14,7 @@
 
 struct IBRes ib_res;
 
-void print_ibv_gid(union ibv_gid gid) {
-    printf("Raw GID: ");
-    for (int i = 0; i < 16; ++i) {
-        printf("%02x", gid.raw[i]);
-        if (i % 2 && i != 15) {
-            printf(":");
-        }
-    }
-    printf("\n");
 
-    printf("Subnet Prefix: 0x%" PRIx64 "\n", (uint64_t) gid.global.subnet_prefix);
-    printf("Interface ID: 0x%" PRIx64 "\n", (uint64_t) gid.global.interface_id);
-}
-
-void print_qp_info(struct QPInfo *qp_info) {
-    printf("LID: %u\n", qp_info->lid);
-    printf("QP Number: %u\n", qp_info->qp_num);
-    printf("Rank: %u\n", qp_info->rank);
-    printf("GID Index: %u\n", qp_info->sgid_index);
-    print_ibv_gid(qp_info->gid);
-}
 
 int connect_qp_server() {
     int ret = 0, n = 0, i = 0;
