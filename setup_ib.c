@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <rte_branch_prediction.h>
 #include <unistd.h>
 #include <malloc.h>
 
@@ -66,9 +67,11 @@ int connect_qp_server() {
         local_qp_info[i].rank      = config_info.rank;
         local_qp_info[i].sgid_index = config_info.sgid_index;
         local_qp_info[i].gid       = ib_res.sgid;
+        local_qp_info[i].ib_port       = config_info.ib_port;
         local_qp_info[i].rkey = ib_res.mr->rkey;
         local_qp_info[i].raddr = (uint64_t)ib_res.mr->addr;
         local_qp_info[i].rsize = ib_res.mr->length;
+        local_qp_info[i].psn = 0;
     }
 
     /* get qp_info from client */
@@ -182,9 +185,11 @@ int connect_qp_client() {
         local_qp_info[i].rank      = config_info.rank;
         local_qp_info[i].sgid_index = config_info.sgid_index;
         local_qp_info[i].gid       = ib_res.sgid;
+        local_qp_info[i].ib_port       = config_info.ib_port;
         local_qp_info[i].rkey = ib_res.mr->rkey;
         local_qp_info[i].raddr = (uint64_t)ib_res.mr->addr;
         local_qp_info[i].rsize = ib_res.mr->length;
+        local_qp_info[i].psn = 0;
     }
 
     /* send qp_info to server */
@@ -334,12 +339,12 @@ int setup_ib() {
     check(ib_res.pd != NULL, "Failed to allocate protection domain.");
 
     /* query IB port attribute */
-    ret = ibv_query_port(ib_res.ctx, config_info.sgid_index, &ib_res.port_attr);
+    ret = ibv_query_port(ib_res.ctx, config_info.ib_port, &ib_res.port_attr);
     check(ret == 0, "Failed to query IB port information.");
 
     /* query GID (RoCEv2) */
     if (ib_res.port_attr.lid == 0 && ib_res.port_attr.link_layer == IBV_LINK_LAYER_ETHERNET) {
-        ret = ibv_query_gid(ib_res.ctx, config_info.sgid_index, config_info.dev_index, &ib_res.sgid);
+        ret = ibv_query_gid(ib_res.ctx, config_info.ib_port, config_info.sgid_index, &ib_res.sgid);
         check(!ret, "Failed to query GID.");
 
         print_ibv_gid(ib_res.sgid);
@@ -373,6 +378,7 @@ int setup_ib() {
     ib_res.cq = ibv_create_cq(ib_res.ctx, ib_res.dev_attr.max_cqe - 1, NULL, NULL, 0);
     check(ib_res.cq != NULL, "Failed to create cq");
 
+    assert(ib_res.dev_attr.max_srq != 0);
     /* create srq */
     struct ibv_srq_init_attr srq_init_attr = {
         .attr.max_wr  = ib_res.dev_attr.max_srq_wr,
@@ -380,36 +386,35 @@ int setup_ib() {
     };
 
     ib_res.srq = ibv_create_srq (ib_res.pd, &srq_init_attr);
+    if (unlikely(!ib_res.srq)) {
+        log_error("Failed to create shared receive queue");
+        goto error;
+    }
 
     /* create qp */
+    // when srq is used, the max_recv_wr and max_recv_sge is ignored
     struct ibv_qp_init_attr qp_init_attr = {
         .send_cq = ib_res.cq,
         .recv_cq = ib_res.cq,
         .srq     = ib_res.srq,
         .cap = {
-            .max_send_wr = ib_res.dev_attr.max_qp_wr,
-            .max_recv_wr = ib_res.dev_attr.max_qp_wr,
+            // TODO add retry to determine the max_send_wr
+            .max_send_wr = 3,
+            /* .max_recv_wr = ib_res.dev_attr.max_qp_wr, */
             .max_send_sge = 1,
-            .max_recv_sge = 1,
+            /* .max_recv_sge = 1, */
         },
         .qp_type = IBV_QPT_RC,
     };
 
     ib_res.qp = (struct ibv_qp **) calloc (ib_res.num_qps, sizeof(struct ibv_qp *));
-    check(ib_res.qp != NULL, "Failed to allocate qp");
+    check(ib_res.qp != NULL, "Failed to allocate qp array");
 
     for (i = 0; i < ib_res.num_qps; i++) {
         ib_res.qp[i] = ibv_create_qp (ib_res.pd, &qp_init_attr);
         check(ib_res.qp[i] != NULL, "Failed to create qp[%d]", i);
     }
 
-    /* connect QP */
-    if (config_info.is_server) {
-        ret = connect_qp_server();
-    } else {
-        ret = connect_qp_client();
-    }
-    check(ret == 0, "Failed to connect qp");
 
     ibv_free_device_list (dev_list);
     return 0;

@@ -60,6 +60,7 @@ struct ConfigInfo {
     int benchmark_type;
     int  sgid_index;         /* local GID index of in ibv_devinfo -v */
     int  dev_index;          /* device index of in ibv_devinfo */
+    int ib_port;
 
     char *sock_port;         /* socket port number */
 

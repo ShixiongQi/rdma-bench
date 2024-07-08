@@ -1,6 +1,7 @@
 #ifndef SETUP_IB_H_
 #define SETUP_IB_H_
 
+#include <assert.h>
 #include <infiniband/verbs.h>
 
 struct IBRes {

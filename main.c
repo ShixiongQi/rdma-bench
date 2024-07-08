@@ -32,11 +32,11 @@ int main (int argc, char *argv[])
 	argv += ret;
 #endif
 
-    if (argc != 6) {
+    if (argc != 7) {
 #ifdef USE_RTE_MEMPOOL
-        printf("Usage: %s -l 0 --file-prefix=$UNIQUE_NAME --proc-type=primary --no-telemetry --no-pci -- config_file sock_port is_server | is_client dev_index sgid_index\n", argv[0]);
+        printf("Usage: %s -l 0 --file-prefix=$UNIQUE_NAME --proc-type=primary --no-telemetry --no-pci -- config_file sock_port is_server | is_client dev_index sgid_index ib_port\n", argv[0]);
 #else
-        printf("Usage: %s config_file sock_port is_server | is_client dev_index sgid_index\n", argv[0]);
+        printf("Usage: %s config_file sock_port is_server | is_client dev_index sgid_index ib_port\n", argv[0]);
 #endif
         return 0;
     }
@@ -53,21 +53,31 @@ int main (int argc, char *argv[])
         config_info.is_client = true;
     } else {
 #ifdef USE_RTE_MEMPOOL
-        printf("Usage: %s l 0 --file-prefix=$UNIQUE_NAME --proc-type=primary --no-telemetry --no-pci -- config_file sock_port is_server | is_client dev_index sgid_index\n", argv[0]);
+        printf("Usage: %s l 0 --file-prefix=$UNIQUE_NAME --proc-type=primary --no-telemetry --no-pci -- config_file sock_port is_server | is_client dev_index sgid_index ib_port\n", argv[0]);
 #else
-        printf("Usage: %s config_file sock_port is_server | is_client dev_index sgid_index\n", argv[0]);
+        printf("Usage: %s config_file sock_port is_server | is_client dev_index sgid_index ib_port\n", argv[0]);
 #endif
         return 0;
     }
 
 	config_info.dev_index  = atoi(argv[4]);
 	config_info.sgid_index = atoi(argv[5]);
+    config_info.ib_port = atoi(argv[6]);
 
     ret = init_env();
     check(ret == 0, "Failed to init env");
 
     ret = setup_ib();
     check(ret == 0, "Failed to setup IB");
+
+    /* connect QP */
+    if (config_info.is_server) {
+        ret = connect_qp_server();
+    } else {
+        ret = connect_qp_client();
+    }
+
+    check(ret == 0, "Failed to connect qp");
 
     if (config_info.is_server) {
         printf("Running Server...\n");

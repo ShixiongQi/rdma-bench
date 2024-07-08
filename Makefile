@@ -39,7 +39,7 @@ debug: CFLAGS +=-g -DDEBUG
 debug: clean
 	@if command -v bear >/dev/null 2>&1; then \
 		echo "Bear is installed, generating compile_commands.json"; \
-		bear make all; \
+		bear -- make all; \
 	else \
 		echo "Bear is not installed, skipping generation of compile_commands.json"; \
 		make all; \

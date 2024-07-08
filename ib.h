@@ -33,9 +33,12 @@ struct QPInfo {
     uint32_t rank;
     union ibv_gid gid;
     uint8_t sgid_index;
+    uint8_t ib_port;
     uint32_t rkey;
     uint64_t raddr;
     uint32_t rsize;
+    uint32_t psn;
+
 }__attribute__ ((packed));
 
 enum MsgType {
