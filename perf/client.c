@@ -233,13 +233,12 @@ void *client_thread_write_imm(void *arg) {
     roffset = 0;
     while(!stop) {
         ret = post_write_imm_data (msg_size, lkey, 0, *qp, buf_ptr, rptr, rkey, 0);
-        log_debug("sent");
         if (unlikely(ret != 0)) {
             log_error("send write imme_data failed, error ret: %d", ret);
             goto error;
         }
 
-        num_completion = ibv_poll_cq(cq, NUM_WC, wc);
+        while ((num_completion = ibv_poll_cq(cq, NUM_WC, wc)) == 0) {};
         if (unlikely(num_completion < 0)) {
             log_error("failed to poll cq");
             goto error;
@@ -250,14 +249,13 @@ void *client_thread_write_imm(void *arg) {
                 goto error;
             }
             if (wc[i].opcode == IBV_WC_RDMA_WRITE) {
-                log_debug("get write completion");
             }
             if (wc[i].opcode == IBV_WC_RECV) {
-                post_srq_recv (msg_size, lkey, wc[i].wr_id, srq, buf_base);
                 if ((wc[i].wc_flags & IBV_WC_WITH_IMM) && ntohl(wc[i].imm_data) == MSG_CTL_STOP) {
                     stop = true;
                 }
             }
+            post_srq_recv (msg_size, lkey, wc[i].wr_id, srq, buf_base);
         }
         buf_offset = (buf_offset + msg_size) % buf_size;
         buf_ptr = buf_base + buf_offset;

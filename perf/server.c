@@ -136,13 +136,11 @@ void *server_thread_write_imm(void *arg) {
 
     stop = false;
     while (!stop) {
-        while ((num_completion = ibv_poll_cq(cq, NUM_WC, wc)) == 0) {}
-
-        if (unlikely( num_completion < 0 )) {
+        num_completion = ibv_poll_cq(cq, NUM_WC, wc);
+        if (unlikely(num_completion < 0)) {
             log_error("failed to poll cq");
             goto error;
         }
-
         for (int i = 0; i < num_completion; i++) {
             if (wc[i].status != IBV_WC_SUCCESS) {
                 log_error("wc failed status: %s.", ibv_wc_status_str(wc[i].status));
@@ -152,15 +150,18 @@ void *server_thread_write_imm(void *arg) {
             if (wc[i].opcode == IBV_WC_RECV_RDMA_WITH_IMM) {
                 /* uint32_t imm_data = ntohl(wc[i].imm_data); */
                 ops_count++;
-                log_error("%ld", ops_count);
                 if (ops_count == NUM_WARMING_UP_OPS) {
                     gettimeofday(&start, NULL);
                 }
                 if (ops_count == TOT_NUM_OPS) {
                     gettimeofday(&end, NULL);
                     stop = true;
+                    break;
                 }
             }
+            ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
+            buf_offset = (buf_offset + msg_size) % buf_size;
+            buf_ptr = buf_base + buf_offset;
         }
     }
 
@@ -187,6 +188,7 @@ void *server_thread_write_imm(void *arg) {
                     stop = true;
                 }
             }
+            ret = post_srq_recv (msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
         }
     }
     
