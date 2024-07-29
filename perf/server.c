@@ -92,7 +92,71 @@ error:
 
 void *server_thread_write_unsignaled(void *arg)
 {
-    return NULL;
+    assert(ib_res.num_qps == 1);
+    int ret = 0;
+    long thread_id = (long)arg;
+    int msg_size = config_info.msg_size;
+    int num_concurr_msgs = config_info.num_concurr_msgs;
+
+    struct ibv_cq *cq = ib_res.cq;
+    struct ibv_srq *srq = ib_res.srq;
+    struct ibv_wc *wc = NULL;
+    uint32_t lkey = ib_res.mr->lkey;
+
+    char *buf_ptr = ib_res.ib_buf;
+    char *buf_base = ib_res.ib_buf;
+    int buf_offset = 0;
+    size_t buf_size = ib_res.ib_buf_size;
+
+    int num_completion = 0;
+
+    wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
+    check(wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
+
+    for (int j = 0; j < num_concurr_msgs; j++)
+    {
+        ret = post_srq_recv(msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
+        if (unlikely(ret != 0))
+        {
+            log_error("post shared receive request fail");
+            goto error;
+        }
+        buf_offset = (buf_offset + msg_size) % buf_size;
+        buf_ptr = buf_base + buf_offset;
+    }
+
+    bool finish = false;
+    while (!finish)
+    {
+        num_completion = ibv_poll_cq(cq, NUM_WC, wc);
+        if (unlikely(num_completion < 0))
+        {
+            log_error("failed to poll cq");
+            goto error;
+        }
+        for (int i = 0; i < num_completion; i++)
+        {
+            if (wc[i].status != IBV_WC_SUCCESS)
+            {
+                log_error("wc failed status: %s.", ibv_wc_status_str(wc[i].status));
+                goto error;
+            }
+            if (wc[i].opcode == IBV_WC_RECV)
+            {
+                /* post a receive */
+                post_srq_recv(msg_size, lkey, wc[i].wr_id, srq, buf_base);
+                if ((wc[i].wc_flags & IBV_WC_WITH_IMM) && (ntohl(wc[i].imm_data) == MSG_CTL_STOP))
+                {
+                    finish = true;
+                }
+            }
+        }
+    }
+    free(wc);
+    pthread_exit((void *)0);
+error:
+    free(wc);
+    pthread_exit((void *)-1);
 }
 
 void *server_thread_write_imm(void *arg)

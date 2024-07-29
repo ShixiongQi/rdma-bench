@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <infiniband/verbs.h>
 #include <unistd.h>
 
 #include "debug.h"
@@ -138,8 +139,8 @@ int post_srq_recv(uint32_t req_size, uint32_t lkey, uint64_t wr_id, struct ibv_s
     return ret;
 }
 
-int post_write_signaled(uint32_t req_size, uint32_t lkey, uint64_t wr_id, struct ibv_qp *qp, char *buf, uint64_t raddr,
-                        uint32_t rkey)
+int post_write(uint32_t req_size, uint32_t lkey, uint64_t wr_id, struct ibv_qp *qp, char *buf, uint64_t raddr,
+               uint32_t rkey, int send_flag)
 {
     int ret = 0;
     struct ibv_send_wr *bad_send_wr;
@@ -151,36 +152,27 @@ int post_write_signaled(uint32_t req_size, uint32_t lkey, uint64_t wr_id, struct
         .sg_list = &list,
         .num_sge = 1,
         .opcode = IBV_WR_RDMA_WRITE,
-        .send_flags = IBV_SEND_SIGNALED,
+        .send_flags = send_flag,
         .wr.rdma.remote_addr = raddr,
         .wr.rdma.rkey = rkey,
     };
 
     ret = ibv_post_send(qp, &send_wr, &bad_send_wr);
     return ret;
+}
+
+int post_write_signaled(uint32_t req_size, uint32_t lkey, uint64_t wr_id, struct ibv_qp *qp, char *buf, uint64_t raddr,
+                        uint32_t rkey)
+{
+    return post_write(req_size, lkey, wr_id, qp, buf, raddr, rkey, IBV_SEND_SIGNALED);
 }
 
 int post_write_unsignaled(uint32_t req_size, uint32_t lkey, uint64_t wr_id, struct ibv_qp *qp, char *buf,
                           uint64_t raddr, uint32_t rkey)
 {
-    int ret = 0;
-    struct ibv_send_wr *bad_send_wr;
-
-    struct ibv_sge sg_list = {.addr = (uintptr_t)buf, .length = req_size, .lkey = lkey};
-
-    struct ibv_send_wr send_wr = {
-        .wr_id = wr_id,
-        .sg_list = &sg_list,
-        .num_sge = 1,
-        .opcode = IBV_WR_RDMA_WRITE,
-        .send_flags = 0,
-        .wr.rdma.remote_addr = raddr,
-        .wr.rdma.rkey = rkey,
-    };
-
-    ret = ibv_post_send(qp, &send_wr, &bad_send_wr);
-    return ret;
+    return post_write(req_size, lkey, wr_id, qp, buf, raddr, rkey, 0);
 }
+
 int post_write_imm_data(uint32_t req_size, uint32_t lkey, uint64_t wr_id, struct ibv_qp *qp, char *buf, uint64_t raddr,
                         uint32_t rkey, uint32_t imm_data)
 {

@@ -417,8 +417,10 @@ int setup_ib()
             {
                 // TODO add retry to determine the max_send_wr
                 .max_send_wr = 64,
+                .max_recv_wr = 64,
                 /* .max_recv_wr = ib_res.dev_attr.max_qp_wr, */
                 .max_send_sge = 1,
+                .max_recv_sge = 1,
                 /* .max_recv_sge = 1, */
             },
         .qp_type = IBV_QPT_RC,

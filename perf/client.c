@@ -170,7 +170,134 @@ error:
 
 void *client_thread_write_unsignaled(void *arg)
 {
-    return NULL;
+    assert(ib_res.num_qps == 1);
+    int ret = 0;
+    long thread_id = (long)arg;
+    int msg_size = config_info.msg_size;
+    int num_concurr_msgs = config_info.num_concurr_msgs;
+
+    struct ibv_qp **qp = ib_res.qp;
+    struct ibv_cq *cq = ib_res.cq;
+    struct ibv_srq *srq = ib_res.srq;
+    struct ibv_wc *wc = NULL;
+    uint32_t lkey = ib_res.mr->lkey;
+
+    char *buf_ptr = ib_res.ib_buf;
+    char *buf_base = ib_res.ib_buf;
+    int buf_offset = 0;
+    size_t buf_size = ib_res.ib_buf_size;
+    int num_completion = 0;
+
+    // remote key and address
+    uint32_t rkey = ib_res.rkey;
+    uint64_t raddr = ib_res.raddr;
+    uint64_t rptr = raddr;
+    uint32_t rsize = ib_res.rsize;
+    int roffset = 0;
+
+    struct timeval start, end;
+    double duration = 0.0;
+    double latency = 0.0;
+
+    wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
+    check(wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
+
+    for (int j = 0; j < num_concurr_msgs; j++)
+    {
+        ret = post_srq_recv(msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
+        if (unlikely(ret != 0))
+        {
+            log_error("post shared receive request fail");
+            goto error;
+        }
+        buf_offset = (buf_offset + msg_size) % buf_size;
+        buf_ptr = buf_base + buf_offset;
+    }
+
+    log_debug("thread[%ld]: ready to send", thread_id);
+
+    buf_offset = 0;
+    roffset = 0;
+    debug("buf_ptr = %" PRIx64 "", (uint64_t)buf_ptr);
+    long int warm_up_iter = 5000;
+    long int total_iter = 200000;
+    int signal_freq = 1;
+    long int opt_count = 0;
+    while (opt_count < total_iter)
+    {
+        for (int i = 0; i < signal_freq; i++)
+        {
+            ret = post_write_unsignaled(msg_size, lkey, 1, *qp, buf_ptr, rptr, rkey);
+            roffset = (roffset + msg_size) % rsize;
+            rptr = raddr + roffset;
+        }
+
+        ret = post_write_signaled(msg_size, lkey, 1, *qp, buf_ptr, rptr, rkey);
+        roffset = (roffset + msg_size) % rsize;
+        rptr = raddr + roffset;
+
+        while ((num_completion = ibv_poll_cq(cq, NUM_WC, wc)) == 0)
+        {
+        };
+        if (unlikely(num_completion < 0))
+        {
+            log_error("failed to poll cq");
+            goto error;
+        }
+        for (int i = 0; i < num_completion; i++)
+        {
+            if (unlikely(wc[i].status != IBV_WC_SUCCESS))
+            {
+                log_error("wc failed status: %s.", ibv_wc_status_str(wc[i].status));
+                goto error;
+            }
+        }
+        opt_count++;
+        if (opt_count == warm_up_iter)
+        {
+            gettimeofday(&start, NULL);
+        }
+        if (opt_count == total_iter)
+        {
+            gettimeofday(&end, NULL);
+            break;
+        }
+    }
+
+    duration = (double)((end.tv_sec - start.tv_sec) + (double)(end.tv_usec - start.tv_usec) / 1000000);
+    latency = duration * 1000000 / (double)(total_iter - warm_up_iter);
+
+    printf("latency: %f for %d unsignaled operations plus a signaled operation\n", latency, signal_freq);
+
+    ret = post_send(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[0], ib_res.ib_buf);
+    bool finish = false;
+    while (!finish)
+    {
+        num_completion = ibv_poll_cq(cq, NUM_WC, wc);
+        if (unlikely(num_completion < 0))
+        {
+            log_error("failed to poll cq");
+            goto error;
+        }
+        for (int i = 0; i < num_completion; i++)
+        {
+            if (wc[i].status != IBV_WC_SUCCESS)
+            {
+                log_error("wc failed status: %s.", ibv_wc_status_str(wc[i].status));
+                goto error;
+            }
+            if (wc[i].opcode == IBV_WC_SEND)
+            {
+                finish = true;
+            }
+        }
+    }
+    free(wc);
+    pthread_exit((void *)0);
+
+error:
+    free(wc);
+    pthread_exit((void *)-1);
 }
 
 void *client_thread_write_imm(void *arg)
