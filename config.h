@@ -16,6 +16,8 @@
 #endif // !USE_RTE_MEMPOOL
  
 #define MAX_HOSTNAME_LEN 1024
+#define NUM_WARMING_UP_OPS      50000
+#define TOT_NUM_OPS             2000000
 
 enum ConfigFileAttr {
     ATTR_SERVERS = 1,

@@ -15,26 +15,30 @@ endif
 
 CC=gcc
 CFLAGS += -Wall -Werror -Wno-stringop-truncation -O3
-INCLUDES = -I. -I./test/unity
+INCLUDES = -I./ -I./test/unity -I./perf
 LDFLAGS += -libverbs
 LIBS=-pthread
 
 # SRCS=main.c client.c config.c ib.c server.c setup_ib.c sock.c
 
 TEST_DIR=test
+PERF_DIR=perf
 UNITY_DIR=test/unity
 BIN_DIR=bin
 
 SRC_FILES = $(wildcard *.c)
 TEST_FILES = $(wildcard $(TEST_DIR)/*.c)
+PERF_FILES = $(wildcard $(PERF_DIR)/*.c)
 UNITY_FILES = $(UNITY_DIR)/unity.c
 
 SRC_OBJS=$(SRC_FILES:.c=.o)
 TEST_OBJS=$(TEST_FILES:.c=.o)
+PERF_OBJS=$(PERF_FILES:.c=.o)
 UNITY_OBJS=$(UNITY_FILES:.c=.o)
 
 PROG=$(BIN_DIR)/rdma-bench
 TEST_EXEC=$(patsubst $(TEST_DIR)/%.c,$(BIN_DIR)/%,$(TEST_FILES))
+
 
 all: $(PROG) $(TEST_EXEC)
 
@@ -51,9 +55,9 @@ debug: clean
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
 
-$(PROG): $(SRC_OBJS)
+$(BIN_DIR)/rdma-bench: $(SRC_OBJS) $(PERF_OBJS)
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(SRC_OBJS) $(LDFLAGS) $(LIBS) $(LDLIBS)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(PERF_DIR)/rdma-bench.o $(PERF_DIR)/client.o $(PERF_DIR)/server.o $(SRC_OBJS) $(LDFLAGS) $(LIBS) $(LDLIBS)
 
 $(TEST_EXEC): $(filter-out main.o, $(SRC_OBJS)) $(TEST_OBJS) $(UNITY_OBJS)
 	@mkdir -p $(BIN_DIR)
@@ -62,4 +66,4 @@ $(TEST_EXEC): $(filter-out main.o, $(SRC_OBJS)) $(TEST_OBJS) $(UNITY_OBJS)
 
 .PHONY: clean
 clean:
-	$(RM) *.o $(TEST_DIR)/*.o $(UNITY_DIR)/*.o *~ $(PROG) $(BIN_DIR)/* compile_commands.json
+	$(RM) *.o $(TEST_DIR)/*.o $(UNITY_DIR)/*.o $(PERF_DIR)/*.o *~ $(BIN_DIR)/* compile_commands.json

@@ -12,8 +12,6 @@
 #define IB_MTU			IBV_MTU_1024
 #define IB_SL			0
 #define IB_WR_ID_STOP		0xE000000000000000
-#define NUM_WARMING_UP_OPS      50
-#define TOT_NUM_OPS             1000
 #define SIG_INTERVAL            1000
 #define NUM_WC 20
 
