@@ -261,6 +261,7 @@ void *server_thread_send (void *arg) {
         ret = post_send (0, lkey, 0, MSG_CTL_START, qp[i], buf_base);
         check(ret == 0, "thread[%ld]: failed to signal the client to start", thread_id);
     }
+    log_debug("wait for client");
 
     while (stop != true) {
         /* poll cq */
@@ -282,7 +283,6 @@ void *server_thread_send (void *arg) {
             
             if (wc[i].opcode == IBV_WC_RECV) {
                 ops_count += 1;
-                debug ("ops_count = %ld", ops_count);
 
                 if (ops_count == NUM_WARMING_UP_OPS) {
                     gettimeofday (&start, NULL);
@@ -304,6 +304,7 @@ void *server_thread_send (void *arg) {
         }
     }
 
+    log_debug("signal to stop");
     /* signal the client to stop */
     for (i = 0; i < num_peers; i++) {
         ret = post_send (0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[i], ib_res.ib_buf);

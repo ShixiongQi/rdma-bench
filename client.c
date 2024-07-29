@@ -274,7 +274,7 @@ void *client_thread_send(void *arg)
     long   thread_id        = (long) arg;
     int    msg_size         = config_info.msg_size;
     int    num_concurr_msgs = config_info.num_concurr_msgs;
-    int    num_peers        = ib_res.num_qps;
+    int    num_peers        = 1;
 
     pthread_t   self;
     cpu_set_t   cpuset;
@@ -340,6 +340,7 @@ void *client_thread_send(void *arg)
                 post_srq_recv (msg_size, lkey, wc[i].wr_id, srq, (char *)wc[i].wr_id);
                 
                 if (ntohl(wc[i].imm_data) == MSG_CTL_START) {
+                    log_debug("received start signal");
                     num_acked_peers += 1;
                     if (num_acked_peers == num_peers) {
                         start_sending = true;
@@ -350,11 +351,11 @@ void *client_thread_send(void *arg)
         }
     }
 
-    log ("thread[%ld]: ready to send", thread_id);
+    log_debug("thread[%ld]: ready to send", thread_id);
 
     /* pre-post sends */
     buf_offset = 0;
-    debug ("buf_ptr = %"PRIx64"", (uint64_t)buf_ptr);
+    log_debug("buf_ptr = %"PRIx64"", (uint64_t)buf_ptr);
     for (int i = 0; i < num_peers; i++) {
         for (int j = 0; j < num_concurr_msgs; j++) {
             ret = post_send (msg_size, lkey, (uint64_t)buf_ptr, (uint32_t)i, qp[i], buf_ptr);
@@ -364,6 +365,7 @@ void *client_thread_send(void *arg)
         }
     }
 
+    log_debug("pre-post send finished");
     num_acked_peers = 0;
     while (stop != true) {
         /* poll cq */
@@ -385,7 +387,6 @@ void *client_thread_send(void *arg)
 
             if (wc[i].opcode == IBV_WC_RECV) {
                 ops_count += 1;
-                debug ("ops_count = %ld", ops_count);
 
                 if (ops_count == NUM_WARMING_UP_OPS) {
                     gettimeofday (&start, NULL);
