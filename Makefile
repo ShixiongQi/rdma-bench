@@ -64,6 +64,13 @@ $(TEST_EXEC): $(filter-out main.o, $(SRC_OBJS)) $(TEST_OBJS) $(UNITY_OBJS)
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LDFLAGS) $(LIBS) $(LDLIBS)
 
 
-.PHONY: clean
+.PHONY: clean format
 clean:
 	$(RM) *.o $(TEST_DIR)/*.o $(UNITY_DIR)/*.o $(PERF_DIR)/*.o *~ $(BIN_DIR)/* compile_commands.json
+
+format:
+	@if command -v clang-format >/dev/null 2>&1; then \
+		clang-format -i $(TEST_FILES) $(TEST_DIR)/*.h $(PERF_FILES) $(PERF_DIR)/*.h $(SRC_FILES) *.h \
+	else \
+		echo "clang-format is not installed, skipping formatting"; \
+	fi

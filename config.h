@@ -1,25 +1,25 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
-#include <stdbool.h>
+#include <assert.h>
 #include <inttypes.h>
 #include <libconfig.h>
-#include <assert.h>
+#include <stdbool.h>
 
 #ifdef USE_RTE_MEMPOOL
 #include <rte_branch_prediction.h>
 #endif
 
-
-#ifndef USE_RTE_MEMPOOL 
+#ifndef USE_RTE_MEMPOOL
 #define unlikely(x) (!!(x))
 #endif // !USE_RTE_MEMPOOL
- 
-#define MAX_HOSTNAME_LEN 1024
-#define NUM_WARMING_UP_OPS      50000
-#define TOT_NUM_OPS             2000000
 
-enum ConfigFileAttr {
+#define MAX_HOSTNAME_LEN 1024
+#define NUM_WARMING_UP_OPS 50000
+#define TOT_NUM_OPS 2000000
+
+enum ConfigFileAttr
+{
     ATTR_SERVERS = 1,
     ATTR_CLIENTS,
     ATTR_MSG_SIZE,
@@ -27,32 +27,35 @@ enum ConfigFileAttr {
     ATTR_BENCHMARK_TYPE,
 };
 
-enum BenchMarkType {
+enum BenchMarkType
+{
     SEND = 1,
     WRITE_SIGNALED,
     WRITE_UNSIGNALED,
     WRITE_IMM,
 };
 
-struct ConfigInfo {
-    int  num_servers;
-    int  num_clients;
-    char **servers;          /* list of servers */
-    char **clients;          /* list of clients */
+struct ConfigInfo
+{
+    int num_servers;
+    int num_clients;
+    char **servers; /* list of servers */
+    char **clients; /* list of clients */
 
-    int self_sockfd;         /* self's socket fd */
-    int *peer_sockfds;       /* peers' socket fd */
-    
-    bool is_server;          /* if the current node is server */
-    bool is_client;          /* if the current node is client */
-    int  rank;               /* the rank of the node */
+    int self_sockfd;   /* self's socket fd */
+    int *peer_sockfds; /* peers' socket fd */
+
+    bool is_server; /* if the current node is server */
+    bool is_client; /* if the current node is client */
+    int rank;       /* the rank of the node */
 
     char name[64];
 
-    int  msg_size;           /* the size of each echo message */
-    int  num_concurr_msgs;   /* the number of messages can be sent concurrently */
+    int msg_size;         /* the size of each echo message */
+    int num_concurr_msgs; /* the number of messages can be sent concurrently */
     int n_nodes;
-    struct {
+    struct
+    {
         int id;
         char hostname[64];
         int peers[UINT8_MAX + 1];
@@ -62,22 +65,22 @@ struct ConfigInfo {
     int current_node_idx;
 
     int benchmark_type;
-    int  sgid_index;         /* local GID index of in ibv_devinfo -v */
-    int  dev_index;          /* device index of in ibv_devinfo */
+    int sgid_index; /* local GID index of in ibv_devinfo -v */
+    int dev_index;  /* device index of in ibv_devinfo */
     int ib_port;
 
-    char *sock_port;         /* socket port number */
+    char *sock_port; /* socket port number */
 
     struct rte_mempool *mempool;
     void *rte_mr; // TODO: save a list of registered MRs in rte_mempool
-}__attribute__((aligned(64)));
+} __attribute__((aligned(64)));
 
 extern struct ConfigInfo config_info;
 
-int  parse_config_file   (char *fname);
-void destroy_config_info ();
-int parse_benchmark_cfg (char *cfg_file, struct ConfigInfo *config);
-void print_benchmark_cfg (struct ConfigInfo *config);
-void print_config_info ();
+int parse_config_file(char *fname);
+void destroy_config_info();
+int parse_benchmark_cfg(char *cfg_file, struct ConfigInfo *config);
+void print_benchmark_cfg(struct ConfigInfo *config);
+void print_config_info();
 
 #endif /* CONFIG_H_*/
