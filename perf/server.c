@@ -108,6 +108,7 @@ void *server_thread_write_imm(void *arg) {
     struct timeval start, end;
     double         duration        = 0.0;
     double         throughput      = 0.0;
+    double latency = 0.0;
 
     int num_completion = 0;
 
@@ -193,8 +194,10 @@ void *server_thread_write_imm(void *arg) {
     duration   = (double)((end.tv_sec - start.tv_sec) + (double) (end.tv_usec - start.tv_usec) / 1000000);
     throughput = (double)(ops_count - NUM_WARMING_UP_OPS) / duration;
 
+    latency = duration * 1000000 / (double)(ops_count - NUM_WARMING_UP_OPS);
     log_info ("thread[%ld]: throughput = %f (ops/s)",  thread_id, throughput);
     printf("thread[%ld]: throughput = %f (ops/s) %f (Bytes/s); ops_count:%ld, duration: %f seconds \n",  thread_id, throughput, throughput * msg_size, ops_count, duration);
+    printf("latency: %f\n", latency);
 
     free (wc);
     pthread_exit((void*)0);

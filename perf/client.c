@@ -38,6 +38,7 @@ void *client_thread_write_signaled(void *arg) {
     struct timeval start, end;
     double         duration        = 0.0;
     double         throughput      = 0.0;
+    double latency = 0.0;
 
     wc = (struct ibv_wc *) calloc (NUM_WC, sizeof(struct ibv_wc));
     check(wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
@@ -117,9 +118,12 @@ void *client_thread_write_signaled(void *arg) {
 
     duration = (double)((end.tv_sec - start.tv_sec) + (double) (end.tv_usec - start.tv_usec) / 1000000);
     throughput = (double)(opt_count - NUM_WARMING_UP_OPS) / duration;
+    latency = duration * 1000000 / (double)(opt_count - NUM_WARMING_UP_OPS);
+
 
     log_info("thread[%ld]: throughput = %f (ops/s)",  thread_id, throughput);
-    printf("thread[%ld]: throughput = %f (ops/s) %f (Bytes/s); ops_count:%ld, duration: %f seconds \n",  thread_id, throughput, throughput * msg_size, opt_count, duration);
+    printf("thread[%ld]: throughput = %f (ops/s) %f (Bytes/s); ops_count:%ld, duration: %f seconds \n",  thread_id, throughput, throughput * msg_size, opt_count - NUM_WARMING_UP_OPS, duration);
+    printf("latency: %f\n", latency);
 
 
     ret = post_send (0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[0], ib_res.ib_buf);
