@@ -4,13 +4,15 @@
 #include <stdbool.h>
 #include <inttypes.h>
 #include <libconfig.h>
-#include <rte_branch_prediction.h>
 #include <assert.h>
 
-#define USE_RTE_MEMPOOL 1
+#ifdef USE_RTE_MEMPOOL
+#include <rte_branch_prediction.h>
+#endif
 
-#if USE_RTE_MEMPOOL == 0
-#define unlikely(x) (!!x)
+
+#ifndef USE_RTE_MEMPOOL 
+#define unlikely(x) (!!(x))
 #endif // !USE_RTE_MEMPOOL
  
 #define MAX_HOSTNAME_LEN 1024

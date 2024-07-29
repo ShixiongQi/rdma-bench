@@ -1,8 +1,5 @@
 #include <stdio.h>
-
-#include <rte_branch_prediction.h>
-#include <rte_eal.h>
-#include <rte_errno.h>
+#include <stdlib.h>
 #include <libconfig.h>
 #include "debug.h"
 #include "config.h"
@@ -11,6 +8,11 @@
 #include "client.h"
 #include "server.h"
 
+#ifdef USE_RTE_MEMPOOL
+#include <rte_branch_prediction.h>
+#include <rte_eal.h>
+#include <rte_errno.h>
+#endif /* ifdef USE_RTE_MEMPOOL */
 extern FILE *log_fp;
 
 int  init_env    ();

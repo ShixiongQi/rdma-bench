@@ -3,12 +3,15 @@ $(error "libconfig is not installed")
 endif
 
 ifneq ($(shell pkg-config --exists libdpdk && echo 0), 0)
-$(error "DPDK is not installed")
-endif
-
+CFLAGS = $(shell pkg-config --cflags libconfig)
+LDFLAGS = $(shell pkg-config --libs-only-L libconfig)
+LDLIBS = $(shell pkg-config --libs-only-l libconfig)
+else
 CFLAGS = $(shell pkg-config --cflags libconfig libdpdk)
 LDFLAGS = $(shell pkg-config --libs-only-L libconfig libdpdk)
 LDLIBS = $(shell pkg-config --libs-only-l libconfig libdpdk)
+endif
+
 
 CC=gcc
 CFLAGS += -Wall -Werror -Wno-stringop-truncation -O3

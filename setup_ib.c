@@ -1,10 +1,12 @@
 #include <arpa/inet.h>
+#ifdef USE_RTE_MEMPOOL
 #include <rte_branch_prediction.h>
+#include <rte_mempool.h>
+#include <rte_errno.h>
+#endif /* ifdef USE_RTE_MEMPOOL */
 #include <unistd.h>
 #include <malloc.h>
 
-#include <rte_mempool.h>
-#include <rte_errno.h>
 
 #include "sock.h"
 #include "ib.h"
