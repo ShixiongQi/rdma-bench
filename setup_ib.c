@@ -13,8 +13,6 @@
 #include "setup_ib.h"
 #include "sock.h"
 
-
-
 #ifdef USE_RTE_MEMPOOL
 #define MEMPOOL_NAME "SPRIGHT_MEMPOOL"
 

@@ -20,10 +20,12 @@
 
 enum BenchMarkType
 {
-    SEND = 1,
+    SEND_SIGNALED = 1,
+    SEND_UNSIGNALED,
     WRITE_SIGNALED,
     WRITE_UNSIGNALED,
     WRITE_IMM,
+
 };
 
 struct ConfigInfo
