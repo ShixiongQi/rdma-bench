@@ -24,7 +24,7 @@ void destroy_env();
 int main(int argc, char *argv[])
 {
     int ret = 0;
-    init_config_info();
+    init_config_info(&config_info);
 #ifdef USE_RTE_MEMPOOL
     ret = rte_eal_init(argc, argv);
     if (unlikely(ret == -1))
@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
 #else
             printf("Usage: %s [config options]\n", argv[0]);
 #endif
-            return 0;
+            goto error;
         }
     }
     print_benchmark_cfg(&config_info);
@@ -130,6 +130,7 @@ int main(int argc, char *argv[])
 error:
     close_ib_connection();
     destroy_env();
+    free_config_info(&config_info);
 #ifdef USE_RTE_MEMPOOL
     rte_eal_cleanup();
 #endif

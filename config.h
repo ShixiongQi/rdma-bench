@@ -37,9 +37,7 @@ enum BenchMarkType
 
 struct ConfigInfo
 {
-    int num_servers;
     int num_clients;
-    char **servers; /* list of servers */
     char **clients; /* list of clients */
 
     char *server_ip;
@@ -80,9 +78,8 @@ struct ConfigInfo
 
 extern struct ConfigInfo config_info;
 
-void init_config_info();
-int parse_config_file(char *fname);
-void destroy_config_info();
+void init_config_info(struct ConfigInfo* config);
+void free_config_info(struct ConfigInfo* config);
 int parse_benchmark_cfg(char *cfg_file, struct ConfigInfo *config);
 void print_benchmark_cfg(struct ConfigInfo *config);
 void print_config_info();

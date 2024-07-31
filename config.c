@@ -9,10 +9,11 @@
 
 struct ConfigInfo config_info;
 
-void init_config_info()
+void init_config_info(struct ConfigInfo* config_info)
 {
-    config_info.is_server = true;
+    config_info->is_server = true;
 }
+
 /* remove space, tab and line return from the line */
 void clean_up_line(char *line)
 {
@@ -93,7 +94,6 @@ int get_rank()
 {
     int ret = 0;
     uint32_t i = 0;
-    uint32_t num_servers = config_info.num_servers;
     uint32_t num_clients = config_info.num_clients;
     struct utsname utsname_buf;
     char hostname[64];
@@ -107,14 +107,6 @@ int get_rank()
     log_debug("local hostname: %s", hostname);
 
     config_info.rank = -1;
-    for (i = 0; i < num_servers; i++)
-    {
-        if (strstr(hostname, config_info.servers[i]))
-        {
-            config_info.rank = i;
-            break;
-        }
-    }
 
     for (i = 0; i < num_clients; i++)
     {
@@ -134,14 +126,8 @@ error:
 void print_benchmark_cfg(struct ConfigInfo *config)
 {
 
-    printf("num_servers: %d\n", config->num_servers);
     printf("num_clients: %d\n", config->num_clients);
 
-    printf("Servers:\n");
-    for (int i = 0; i < config->num_servers; i++)
-    {
-        printf("  %s\n", config->servers[i]);
-    }
 
     printf("server_ip: %s\n", config->server_ip);
     printf("Clients:\n");
@@ -316,128 +302,25 @@ error_1:
     return -1;
 }
 
-int parse_config_file(char *fname)
+
+void free_config_info(struct ConfigInfo *config_info)
 {
-    int ret = 0;
-    FILE *fp = NULL;
-    char line[256] = {'\0'};
-    int attr = 0;
-
-    fp = fopen(fname, "r");
-    check(fp != NULL, "Failed to open config file %s", fname);
-
-    while (fgets(line, 256, fp) != NULL)
-    {
-        // skip comments
-        if (strstr(line, "#") != NULL)
-        {
-            continue;
-        }
-
-        clean_up_line(line);
-
-        if (strstr(line, "servers:"))
-        {
-            attr = ATTR_SERVERS;
-            continue;
-        }
-        else if (strstr(line, "clients:"))
-        {
-            attr = ATTR_CLIENTS;
-            continue;
-        }
-        else if (strstr(line, "msg_size:"))
-        {
-            attr = ATTR_MSG_SIZE;
-            continue;
-        }
-        else if (strstr(line, "num_concurr_msgs:"))
-        {
-            attr = ATTR_NUM_CONCURR_MSGS;
-            continue;
-        }
-        else if (strstr(line, "benchmark_type:"))
-        {
-            attr = ATTR_BENCHMARK_TYPE;
-            continue;
-        }
-
-        if (attr == ATTR_SERVERS)
-        {
-            ret = parse_node_list(line, &config_info.servers);
-            check(ret > 0, "Failed to get server list");
-            config_info.num_servers = ret;
-        }
-        else if (attr == ATTR_CLIENTS)
-        {
-            ret = parse_node_list(line, &config_info.clients);
-            check(ret > 0, "Failed to get client list");
-            config_info.num_clients = ret;
-        }
-        else if (attr == ATTR_MSG_SIZE)
-        {
-            config_info.msg_size = atoi(line);
-            check(config_info.msg_size > 0, "Invalid Value: msg_size = %d", config_info.msg_size);
-        }
-        else if (attr == ATTR_NUM_CONCURR_MSGS)
-        {
-            config_info.num_concurr_msgs = atoi(line);
-            check(config_info.num_concurr_msgs > 0, "Invalid Value: num_concurr_msgs = %d",
-                  config_info.num_concurr_msgs);
-        }
-        else if (attr == ATTR_BENCHMARK_TYPE)
-        {
-            config_info.benchmark_type = atoi(line);
-            log_debug("benchmark_type: %d", config_info.benchmark_type);
-        }
-
-        attr = 0;
-    }
-
-    ret = get_rank();
-    check(ret == 0, "Failed to get rank");
-
-    fclose(fp);
-
-    return 0;
-
-error:
-    if (fp != NULL)
-    {
-        fclose(fp);
-    }
-    return -1;
-}
-
-void destroy_config_info()
-{
-    int num_servers = config_info.num_servers;
-    int num_clients = config_info.num_clients;
+    int num_clients = config_info->num_clients;
     int i;
 
-    if (config_info.servers != NULL)
-    {
-        for (i = 0; i < num_servers; i++)
-        {
-            if (config_info.servers[i] != NULL)
-            {
-                free(config_info.servers[i]);
-            }
-        }
-        free(config_info.servers);
-    }
-
-    if (config_info.clients != NULL)
+    if (config_info->clients != NULL)
     {
         for (i = 0; i < num_clients; i++)
         {
-            if (config_info.clients[i] != NULL)
+            if (config_info->clients[i] != NULL)
             {
-                free(config_info.clients[i]);
+                free(config_info->clients[i]);
             }
         }
-        free(config_info.clients);
+        free(config_info->clients);
     }
+    free(config_info->server_ip);
+    free(config_info->sock_port);
 }
 
 void print_config_info()
@@ -448,12 +331,6 @@ void print_config_info()
     {
         log("is_server = %s", "true");
     }
-    /* else */
-    /* { */
-    /*     perror("Not server or client"); */
-    /*     exit(1); */
-    /* } */
-
     log("rank                      = %d", config_info.rank);
     log("msg_size                  = %d", config_info.msg_size);
     log("num_concurr_msgs          = %d", config_info.num_concurr_msgs);
