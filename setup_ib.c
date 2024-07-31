@@ -158,7 +158,8 @@ error:
 int connect_qp_client()
 {
     int ret = 0, n = 0, i = 0;
-    int num_peers = ib_res.num_qps;
+    int num_peers = 1;
+
     config_info.self_sockfd = -1;
     char sock_buf[64] = {'\0'};
 
@@ -170,7 +171,7 @@ int connect_qp_client()
 
     for (i = 0; i < num_peers; i++)
     {
-        config_info.peer_sockfds[i] = sock_create_connect(config_info.servers[i], config_info.sock_port);
+        config_info.peer_sockfds[i] = sock_create_connect(config_info.server_ip, config_info.sock_port);
         check(config_info.peer_sockfds[i] > 0, "Failed to create peer_sockfd[%d]", i);
     }
 
@@ -334,15 +335,7 @@ int setup_ib()
     struct ibv_device **dev_list = NULL;
     memset(&ib_res, 0, sizeof(struct IBRes));
 
-    if (config_info.is_server)
-    {
-        ib_res.num_qps = config_info.num_clients;
-    }
-    else
-    {
-        ib_res.num_qps = config_info.num_servers;
-    }
-
+    ib_res.num_qps = 1;
     /* get IB device list */
     dev_list = ibv_get_device_list(&num_devices);
     check(dev_list != NULL, "Failed to get ib device list.");

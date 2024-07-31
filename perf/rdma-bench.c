@@ -4,9 +4,12 @@
 #include "ib.h"
 #include "server.h"
 #include "setup_ib.h"
+#include <getopt.h>
 #include <libconfig.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #ifdef USE_RTE_MEMPOOL
 #include <rte_branch_prediction.h>
@@ -21,7 +24,7 @@ void destroy_env();
 int main(int argc, char *argv[])
 {
     int ret = 0;
-
+    init_config_info();
 #ifdef USE_RTE_MEMPOOL
     ret = rte_eal_init(argc, argv);
     if (unlikely(ret == -1))
@@ -34,47 +37,65 @@ int main(int argc, char *argv[])
     argv += ret;
 #endif
 
-    if (argc != 7)
+    static struct option long_options[] = {
+        {"server_ip", required_argument, NULL, 1},    {"dev_index", required_argument, NULL, 2},
+        {"sgid_index", required_argument, NULL, 3},   {"ib_port", required_argument, NULL, 4},
+        {"sock_port", required_argument, NULL, 5},    {"benchmark_type", required_argument, NULL, 6},
+        {"msg_size", required_argument, NULL, 7},     {"num_concurr_msgs", required_argument, NULL, 8},
+        {"warm_up_iter", required_argument, NULL, 9}, {"total_iter", required_argument, NULL, 10},
+        {"signal_freq", required_argument, NULL, 11}};
+
+    int ch = 0;
+    while ((ch = getopt_long(argc, argv, "", long_options, NULL)) != -1)
     {
+        switch (ch)
+        {
+        case 1:
+            config_info.is_server = false;
+            config_info.server_ip = strdup(optarg);
+            break;
+        case 2:
+            config_info.dev_index = atoi(optarg);
+            break;
+        case 3:
+            config_info.sgid_index = atoi(optarg);
+            break;
+        case 4:
+            config_info.ib_port = atoi(optarg);
+            break;
+        case 5:
+            config_info.sock_port = strdup(optarg);
+            break;
+        case 6:
+            config_info.benchmark_type = atoi(optarg);
+            break;
+        case 7:
+            config_info.msg_size = atoi(optarg);
+            break;
+        case 8:
+            config_info.num_concurr_msgs = atoi(optarg);
+            break;
+        case 9:
+            config_info.warm_up_iter = atoi(optarg);
+            break;
+        case 10:
+            config_info.total_iter = atoi(optarg);
+            break;
+        case 11:
+            config_info.signal_freq = atoi(optarg);
+            break;
+        case '?':
 #ifdef USE_RTE_MEMPOOL
-        printf("Usage: %s -l 0 --file-prefix=$UNIQUE_NAME --proc-type=primary --no-telemetry --no-pci -- config_file "
-               "sock_port is_server | is_client dev_index sgid_index ib_port\n",
-               argv[0]);
+            printf("Usage: %s -l 0 --file-prefix=$UNIQUE_NAME --proc-type=primary --no-telemetry --no-pci -- [config "
+                   "options]\n",
+                   argv[0]);
 #else
-        printf("Usage: %s config_file sock_port is_server | is_client dev_index sgid_index ib_port\n", argv[0]);
+            printf("Usage: %s [config options]\n", argv[0]);
 #endif
-        return 0;
+            return 0;
+        }
     }
-
-    ret = parse_config_file(argv[1]);
-    check(ret == 0, "Failed to parse config file");
-    config_info.sock_port = argv[2];
-
-    if (strstr("is_server", argv[3]))
-    {
-        config_info.is_server = true;
-        config_info.is_client = false;
-    }
-    else if (strstr("is_client", argv[3]))
-    {
-        config_info.is_server = false;
-        config_info.is_client = true;
-    }
-    else
-    {
-#ifdef USE_RTE_MEMPOOL
-        printf("Usage: %s l 0 --file-prefix=$UNIQUE_NAME --proc-type=primary --no-telemetry --no-pci -- config_file "
-               "sock_port is_server | is_client dev_index sgid_index ib_port\n",
-               argv[0]);
-#else
-        printf("Usage: %s config_file sock_port is_server | is_client dev_index sgid_index ib_port\n", argv[0]);
-#endif
-        return 0;
-    }
-
-    config_info.dev_index = atoi(argv[4]);
-    config_info.sgid_index = atoi(argv[5]);
-    config_info.ib_port = atoi(argv[6]);
+    print_benchmark_cfg(&config_info);
 
     ret = init_env();
     check(ret == 0, "Failed to init env");
@@ -121,17 +142,16 @@ int init_env()
 
     if (config_info.is_server)
     {
-        sprintf(fname, "server-%d.log", config_info.rank);
+        sprintf(fname, "server.log");
     }
     else
     {
-        sprintf(fname, "client-%d.log", config_info.rank);
+        sprintf(fname, "client.log");
     }
     log_fp = fopen(fname, "w");
     check(log_fp != NULL, "Failed to open log file");
 
     log(LOG_HEADER, "IB Echo Server");
-    print_config_info();
 
     return 0;
 error:

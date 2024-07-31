@@ -42,11 +42,11 @@ struct ConfigInfo
     char **servers; /* list of servers */
     char **clients; /* list of clients */
 
+    char *server_ip;
     int self_sockfd;   /* self's socket fd */
     int *peer_sockfds; /* peers' socket fd */
 
     bool is_server; /* if the current node is server */
-    bool is_client; /* if the current node is client */
     int rank;       /* the rank of the node */
 
     char name[64];
@@ -68,6 +68,9 @@ struct ConfigInfo
     int sgid_index; /* local GID index of in ibv_devinfo -v */
     int dev_index;  /* device index of in ibv_devinfo */
     int ib_port;
+    int warm_up_iter;
+    int total_iter;
+    int signal_freq;
 
     char *sock_port; /* socket port number */
 
@@ -77,6 +80,7 @@ struct ConfigInfo
 
 extern struct ConfigInfo config_info;
 
+void init_config_info();
 int parse_config_file(char *fname);
 void destroy_config_info();
 int parse_benchmark_cfg(char *cfg_file, struct ConfigInfo *config);

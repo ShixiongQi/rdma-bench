@@ -98,7 +98,9 @@ void *client_thread_write_signaled(void *arg)
     {
         ret = post_write_signaled(msg_size, lkey, 1, *qp, buf_ptr, rptr, rkey);
 
-        num_completion = ibv_poll_cq(cq, NUM_WC, wc);
+        while ((num_completion = ibv_poll_cq(cq, NUM_WC, wc)) == 0)
+        {
+        };
         if (unlikely(num_completion < 0))
         {
             log_error("failed to poll cq");
@@ -219,11 +221,11 @@ void *client_thread_write_unsignaled(void *arg)
     buf_offset = 0;
     roffset = 0;
     debug("buf_ptr = %" PRIx64 "", (uint64_t)buf_ptr);
-    long int warm_up_iter = 5000;
-    long int total_iter = 200000;
-    int signal_freq = 1;
+    long int warm_up_iter = config_info.warm_up_iter;
+    long int total_iter = config_info.total_iter;
+    int signal_freq = config_info.signal_freq;
     long int opt_count = 0;
-    while (opt_count < total_iter)
+    while (true)
     {
         for (int i = 0; i < signal_freq; i++)
         {
@@ -236,9 +238,10 @@ void *client_thread_write_unsignaled(void *arg)
         roffset = (roffset + msg_size) % rsize;
         rptr = raddr + roffset;
 
-        while ((num_completion = ibv_poll_cq(cq, NUM_WC, wc)) == 0)
+        do
         {
-        };
+            num_completion = ibv_poll_cq(cq, NUM_WC, wc);
+        } while (num_completion == 0);
         if (unlikely(num_completion < 0))
         {
             log_error("failed to poll cq");

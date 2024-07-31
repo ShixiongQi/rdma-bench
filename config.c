@@ -9,6 +9,10 @@
 
 struct ConfigInfo config_info;
 
+void init_config_info()
+{
+    config_info.is_server = true;
+}
 /* remove space, tab and line return from the line */
 void clean_up_line(char *line)
 {
@@ -139,6 +143,7 @@ void print_benchmark_cfg(struct ConfigInfo *config)
         printf("  %s\n", config->servers[i]);
     }
 
+    printf("server_ip: %s\n", config->server_ip);
     printf("Clients:\n");
     for (int i = 0; i < config->num_clients; i++)
     {
@@ -148,7 +153,6 @@ void print_benchmark_cfg(struct ConfigInfo *config)
     printf("self_sockfd: %d\n", config->self_sockfd);
 
     printf("is_server: %s\n", config->is_server ? "true" : "false");
-    printf("is_client: %s\n", config->is_client ? "true" : "false");
     printf("rank: %d\n", config->rank);
     printf("name: %s\n", config->name);
     printf("msg_size: %d\n", config->msg_size);
@@ -169,8 +173,17 @@ void print_benchmark_cfg(struct ConfigInfo *config)
         }
     }
 
+    printf("sock port: %s\n", config->sock_port);
     printf("current_node_idx: %d\n", config->current_node_idx);
     printf("benchmark_type: %d\n", config->benchmark_type);
+    printf("sgid_index: %d\n", config->sgid_index);
+    printf("dev_index: %d\n", config->dev_index);
+    printf("ib_port: %d\n", config->ib_port);
+    printf("msg_size: %d\n", config->msg_size);
+    printf("num_concurr_msgs: %d\n", config->num_concurr_msgs);
+    printf("warm_up_iter: %d\n", config->warm_up_iter);
+    printf("total_iter: %d\n", config->total_iter);
+    printf("signal_freq: %d\n", config->signal_freq);
 }
 
 int parse_benchmark_cfg(char *cfg_file, struct ConfigInfo *config_info)
@@ -435,15 +448,11 @@ void print_config_info()
     {
         log("is_server = %s", "true");
     }
-    else if (config_info.is_client)
-    {
-        log("is_client = %s", "true");
-    }
-    else
-    {
-        perror("Not server or client");
-        exit(1);
-    }
+    /* else */
+    /* { */
+    /*     perror("Not server or client"); */
+    /*     exit(1); */
+    /* } */
 
     log("rank                      = %d", config_info.rank);
     log("msg_size                  = %d", config_info.msg_size);
