@@ -4,4 +4,5 @@
 #include "setup_ib.h"
 int run_client(struct IBRes *ib_res);
 
+int connect_qp_client(struct IBRes *ib_res);
 #endif /* client.h */

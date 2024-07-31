@@ -30,7 +30,4 @@ struct IBRes
 int setup_ib(struct IBRes *ib_res);
 void close_ib_connection(struct IBRes *ib_res);
 
-int connect_qp_server(struct IBRes *ib_res);
-int connect_qp_client(struct IBRes *ib_res);
-
 #endif /*setup_ib.h*/

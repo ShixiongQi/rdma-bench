@@ -2,12 +2,14 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 #include "config.h"
 #include "debug.h"
 #include "ib.h"
 #include "server.h"
 #include "setup_ib.h"
+#include "sock.h"
 
 struct args
 {
@@ -547,6 +549,130 @@ error:
         free(threads);
     }
     pthread_attr_destroy(&attr);
+
+    return -1;
+}
+
+int connect_qp_server(struct IBRes *ib_res)
+{
+    int ret = 0, n = 0, i = 0;
+    /* int num_peers = config_info.num_clients; */
+    int num_peers = 1;
+    struct sockaddr_in peer_addr;
+    socklen_t peer_addr_len = sizeof(struct sockaddr_in);
+    char sock_buf[64] = {'\0'};
+    struct QPInfo *local_qp_info = NULL;
+    struct QPInfo *remote_qp_info = NULL;
+
+    config_info.self_sockfd = sock_create_bind(config_info.sock_port);
+    check(config_info.self_sockfd > 0, "Failed to create server socket.");
+    listen(config_info.self_sockfd, 5);
+
+    config_info.peer_sockfds = (int *)calloc(num_peers, sizeof(int));
+    check(config_info.peer_sockfds != NULL, "Failed to allocate peer_sockfd");
+
+    for (i = 0; i < num_peers; i++)
+    {
+        config_info.peer_sockfds[i] = accept(config_info.self_sockfd, (struct sockaddr *)&peer_addr, &peer_addr_len);
+        check(config_info.peer_sockfds[i] > 0, "Failed to create peer_sockfd[%d]", i);
+    }
+
+    /* init local qp_info */
+    local_qp_info = (struct QPInfo *)calloc(num_peers, sizeof(struct QPInfo));
+    check(local_qp_info != NULL, "Failed to allocate local_qp_info");
+
+    for (i = 0; i < num_peers; i++)
+    {
+        local_qp_info[i].lid = ib_res->port_attr.lid;
+        local_qp_info[i].qp_num = ib_res->qp[i]->qp_num;
+        /* local_qp_info[i].rank = config_info.rank; */
+        local_qp_info[i].sgid_index = config_info.sgid_index;
+        local_qp_info[i].gid = ib_res->sgid;
+        local_qp_info[i].ib_port = config_info.ib_port;
+        local_qp_info[i].rkey = ib_res->mr->rkey;
+        local_qp_info[i].raddr = (uint64_t)ib_res->mr->addr;
+        local_qp_info[i].rsize = ib_res->mr->length;
+        local_qp_info[i].psn = 0;
+    }
+
+    /* get qp_info from client */
+    remote_qp_info = (struct QPInfo *)calloc(num_peers, sizeof(struct QPInfo));
+    check(remote_qp_info != NULL, "Failed to allocate remote_qp_info");
+
+    for (i = 0; i < num_peers; i++)
+    {
+        ret = sock_get_qp_info(config_info.peer_sockfds[i], &remote_qp_info[i]);
+        check(ret == 0, "Failed to get qp_info from client[%d]", i);
+    }
+    // TODO temporary setting for one server one client benchmark
+    assert(num_peers == 1);
+    ib_res->raddr = remote_qp_info[0].raddr;
+    ib_res->rkey = remote_qp_info[0].rkey;
+    ib_res->rsize = remote_qp_info[0].rsize;
+
+    /* send qp_info to client */
+    int peer_ind = -1;
+    for (i = 0; i < num_peers; i++)
+    {
+        peer_ind = 0;
+        ret = sock_set_qp_info(config_info.peer_sockfds[i], &local_qp_info[peer_ind]);
+        check(ret == 0, "Failed to send qp_info to client[%d]", peer_ind);
+    }
+
+    /* change send QP state to RTS */
+    log(LOG_SUB_HEADER, "Start of IB Config");
+    for (i = 0; i < num_peers; i++)
+    {
+        peer_ind = 0;
+
+        printf("Loca qp_num: %" PRIu32 ", Remote qp_num %" PRIu32 "\n", local_qp_info[peer_ind].qp_num,
+               remote_qp_info[i].qp_num);
+
+        printf("Local QP info: \n");
+        print_qp_info(&local_qp_info[peer_ind]);
+        printf("\n");
+        printf("Remote QP info: \n");
+        print_qp_info(&remote_qp_info[i]);
+        printf("\n");
+
+        ret = modify_qp_to_rts(ib_res->qp[peer_ind], &local_qp_info[peer_ind], &remote_qp_info[i]);
+        check(ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
+        log("\tLocal qp[%" PRIu32 "] <-> Remote qp[%" PRIu32 "]", ib_res->qp[peer_ind]->qp_num,
+            remote_qp_info[i].qp_num);
+    }
+    log(LOG_SUB_HEADER, "End of IB Config");
+
+    /* sync with clients */
+    for (i = 0; i < num_peers; i++)
+    {
+        n = sock_read(config_info.peer_sockfds[i], sock_buf, sizeof(SOCK_SYNC_MSG));
+        check(n == sizeof(SOCK_SYNC_MSG), "Failed to receive sync from client");
+    }
+
+    for (i = 0; i < num_peers; i++)
+    {
+        n = sock_write(config_info.peer_sockfds[i], sock_buf, sizeof(SOCK_SYNC_MSG));
+        check(n == sizeof(SOCK_SYNC_MSG), "Failed to write sync to client");
+    }
+
+    return 0;
+
+error:
+    if (config_info.peer_sockfds != NULL)
+    {
+        for (i = 0; i < num_peers; i++)
+        {
+            if (config_info.peer_sockfds[i] > 0)
+            {
+                close(config_info.peer_sockfds[i]);
+            }
+        }
+        free(config_info.peer_sockfds);
+    }
+    if (config_info.self_sockfd > 0)
+    {
+        close(config_info.self_sockfd);
+    }
 
     return -1;
 }
