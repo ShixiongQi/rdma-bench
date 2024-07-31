@@ -107,7 +107,7 @@ error:
     return -1;
 }
 
-int post_send(uint32_t req_size, uint32_t lkey, uint64_t wr_id, uint32_t imm_data, struct ibv_qp *qp, char *buf)
+int post_send(uint32_t req_size, uint32_t lkey, uint64_t wr_id, uint32_t imm_data, struct ibv_qp *qp, char *buf, int flag)
 {
     int ret = 0;
     struct ibv_send_wr *bad_send_wr;
@@ -125,6 +125,17 @@ int post_send(uint32_t req_size, uint32_t lkey, uint64_t wr_id, uint32_t imm_dat
     return ret;
 }
 
+
+int post_send_signaled(uint32_t req_size, uint32_t lkey, uint64_t wr_id, uint32_t imm_data, struct ibv_qp *qp, char *buf)
+{
+    return post_send(req_size, lkey, wr_id, imm_data, qp, buf, IBV_SEND_SIGNALED);
+
+}
+int post_send_unsignaled(uint32_t req_size, uint32_t lkey, uint64_t wr_id, uint32_t imm_data, struct ibv_qp *qp, char *buf)
+{
+    return post_send(req_size, lkey, wr_id, imm_data, qp, buf, 0);
+
+}
 int post_srq_recv(uint32_t req_size, uint32_t lkey, uint64_t wr_id, struct ibv_srq *srq, char *buf)
 {
     int ret = 0;

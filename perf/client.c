@@ -148,7 +148,7 @@ void *client_thread_write_signaled(void *arg)
            throughput * msg_size, opt_count - NUM_WARMING_UP_OPS, duration);
     printf("latency: %f\n", latency);
 
-    ret = post_send(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[0], ib_res->ib_buf);
+    ret = post_send_signaled(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[0], ib_res->ib_buf);
     bool finish = false;
     while (!finish)
     {
@@ -282,7 +282,7 @@ void *client_thread_write_unsignaled(void *arg)
 
     printf("latency: %f for %d unsignaled operations plus a signaled operation\n", latency, signal_freq);
 
-    ret = post_send(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[0], ib_res->ib_buf);
+    ret = post_send_signaled(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[0], ib_res->ib_buf);
     bool finish = false;
     while (!finish)
     {
@@ -454,8 +454,6 @@ void *client_thread_send(void *arg)
     int num_concurr_msgs = config_info.num_concurr_msgs;
     int num_peers = 1;
 
-    pthread_t self;
-    cpu_set_t cpuset;
 
     struct ibv_qp **qp = ib_res->qp;
     struct ibv_cq *cq = ib_res->cq;
@@ -476,11 +474,6 @@ void *client_thread_send(void *arg)
     long ops_count = 0;
     double duration = 0.0;
     double throughput = 0.0;
-
-    /* set thread affinity */
-    self = pthread_self();
-    ret = pthread_setaffinity_np(self, sizeof(cpu_set_t), &cpuset);
-    check(ret == 0, "thread: failed to set thread affinity");
 
     /* pre-post recvs */
     wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
@@ -545,7 +538,7 @@ void *client_thread_send(void *arg)
     {
         for (int j = 0; j < num_concurr_msgs; j++)
         {
-            ret = post_send(msg_size, lkey, (uint64_t)buf_ptr, (uint32_t)i, qp[i], buf_ptr);
+            ret = post_send_signaled(msg_size, lkey, (uint64_t)buf_ptr, (uint32_t)i, qp[i], buf_ptr);
             check(ret == 0, "thread: failed to post send");
             buf_offset = (buf_offset + msg_size) % buf_size;
             buf_ptr = buf_base + buf_offset;
@@ -604,7 +597,7 @@ void *client_thread_send(void *arg)
                 else
                 {
                     /* echo the message back */
-                    post_send(msg_size, lkey, 0, imm_data, qp[imm_data], msg_ptr);
+                    post_send_signaled(msg_size, lkey, 0, imm_data, qp[imm_data], msg_ptr);
                 }
 
                 /* post a new receive */

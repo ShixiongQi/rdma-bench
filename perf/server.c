@@ -55,7 +55,7 @@ void *server_thread_write_signaled(void *arg)
     /* signal the client to start */
     printf("signal the client to start...\n");
 
-    ret = post_send(0, lkey, 0, MSG_CTL_START, qp[0], buf_base);
+    ret = post_send_signaled(0, lkey, 0, MSG_CTL_START, qp[0], buf_base);
     if (unlikely(ret != 0))
     {
         log_error("post start fail");
@@ -213,7 +213,7 @@ void *server_thread_write_imm(void *arg)
     /* signal the client to start */
     printf("signal the client to start...\n");
 
-    ret = post_send(0, lkey, 0, MSG_CTL_START, qp[0], buf_base);
+    ret = post_send_signaled(0, lkey, 0, MSG_CTL_START, qp[0], buf_base);
     check(ret == 0, "thread: failed to signal the client to start");
 
     printf("signaled the client to start...\n");
@@ -257,7 +257,7 @@ void *server_thread_write_imm(void *arg)
         }
     }
 
-    ret = post_send(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[0], ib_res->ib_buf);
+    ret = post_send_signaled(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[0], ib_res->ib_buf);
     check(ret == 0, "thread: failed to signal the client to stop");
 
     stop = false;
@@ -314,8 +314,6 @@ void *server_thread_send(void *arg)
     int msg_size = config_info.msg_size;
     int num_peers = ib_res->num_qps;
 
-    pthread_t self;
-    cpu_set_t cpuset;
 
     struct ibv_qp **qp = ib_res->qp;
     struct ibv_cq *cq = ib_res->cq;
@@ -339,10 +337,6 @@ void *server_thread_send(void *arg)
     wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
     check(wc != NULL, "thread: failed to allocate wc.");
 
-    /* set thread affinity */
-    self = pthread_self();
-    ret = pthread_setaffinity_np(self, sizeof(cpu_set_t), &cpuset);
-    check(ret == 0, "thread: failed to set thread affinity");
 
     /* pre-post recvs */
     wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
@@ -363,7 +357,7 @@ void *server_thread_send(void *arg)
 
     for (i = 0; i < num_peers; i++)
     {
-        ret = post_send(0, lkey, 0, MSG_CTL_START, qp[i], buf_base);
+        ret = post_send_signaled(0, lkey, 0, MSG_CTL_START, qp[i], buf_base);
         check(ret == 0, "thread: failed to signal the client to start");
     }
     log_debug("wait for client");
@@ -409,7 +403,7 @@ void *server_thread_send(void *arg)
                 /* echo the message back */
                 imm_data = ntohl(wc[i].imm_data);
                 char *msg_ptr = (char *)wc[i].wr_id;
-                post_send(msg_size, lkey, 0, imm_data, qp[imm_data], msg_ptr);
+                post_send_signaled(msg_size, lkey, 0, imm_data, qp[imm_data], msg_ptr);
 
                 /* post a new receive */
                 post_srq_recv(msg_size, lkey, wc[i].wr_id, srq, msg_ptr);
@@ -421,7 +415,7 @@ void *server_thread_send(void *arg)
     /* signal the client to stop */
     for (i = 0; i < num_peers; i++)
     {
-        ret = post_send(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[i], ib_res->ib_buf);
+        ret = post_send_signaled(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[i], ib_res->ib_buf);
         check(ret == 0, "thread: failed to signal the client to stop");
     }
 
