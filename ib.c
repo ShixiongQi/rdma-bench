@@ -26,7 +26,6 @@ void print_qp_info(struct QPInfo *qp_info)
 {
     printf("LID: %u\n", qp_info->lid);
     printf("QP Number: %u\n", qp_info->qp_num);
-    printf("Rank: %u\n", qp_info->rank);
     printf("GID Index: %u\n", qp_info->sgid_index);
     print_ibv_gid(qp_info->gid);
     printf("ib_port: %u\n", qp_info->ib_port);

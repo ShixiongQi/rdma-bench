@@ -18,7 +18,8 @@ struct IBRes ib_res;
 int connect_qp_server()
 {
     int ret = 0, n = 0, i = 0;
-    int num_peers = config_info.num_clients;
+    /* int num_peers = config_info.num_clients; */
+    int num_peers = 1;
     struct sockaddr_in peer_addr;
     socklen_t peer_addr_len = sizeof(struct sockaddr_in);
     char sock_buf[64] = {'\0'};
@@ -46,7 +47,7 @@ int connect_qp_server()
     {
         local_qp_info[i].lid = ib_res.port_attr.lid;
         local_qp_info[i].qp_num = ib_res.qp[i]->qp_num;
-        local_qp_info[i].rank = config_info.rank;
+        /* local_qp_info[i].rank = config_info.rank; */
         local_qp_info[i].sgid_index = config_info.sgid_index;
         local_qp_info[i].gid = ib_res.sgid;
         local_qp_info[i].ib_port = config_info.ib_port;
@@ -73,18 +74,9 @@ int connect_qp_server()
 
     /* send qp_info to client */
     int peer_ind = -1;
-    int j = 0;
     for (i = 0; i < num_peers; i++)
     {
-        peer_ind = -1;
-        for (j = 0; j < num_peers; j++)
-        {
-            if (remote_qp_info[j].rank == i)
-            {
-                peer_ind = j;
-                break;
-            }
-        }
+        peer_ind = 0;
         ret = sock_set_qp_info(config_info.peer_sockfds[i], &local_qp_info[peer_ind]);
         check(ret == 0, "Failed to send qp_info to client[%d]", peer_ind);
     }
@@ -93,15 +85,16 @@ int connect_qp_server()
     log(LOG_SUB_HEADER, "Start of IB Config");
     for (i = 0; i < num_peers; i++)
     {
-        peer_ind = -1;
-        for (j = 0; j < num_peers; j++)
-        {
-            if (remote_qp_info[j].rank == i)
-            {
-                peer_ind = j;
-                break;
-            }
-        }
+        /* peer_ind = -1; */
+        /* for (j = 0; j < num_peers; j++) */
+        /* { */
+        /*     if (remote_qp_info[j].rank == i) */
+        /*     { */
+        /*         peer_ind = j; */
+        /*         break; */
+        /*     } */
+        /* } */
+        peer_ind = 0;
 
         printf("Loca qp_num: %" PRIu32 ", Remote qp_num %" PRIu32 "\n", local_qp_info[peer_ind].qp_num,
                remote_qp_info[i].qp_num);
@@ -183,7 +176,7 @@ int connect_qp_client()
     {
         local_qp_info[i].lid = ib_res.port_attr.lid;
         local_qp_info[i].qp_num = ib_res.qp[i]->qp_num;
-        local_qp_info[i].rank = config_info.rank;
+        /* local_qp_info[i].rank = config_info.rank; */
         local_qp_info[i].sgid_index = config_info.sgid_index;
         local_qp_info[i].gid = ib_res.sgid;
         local_qp_info[i].ib_port = config_info.ib_port;
@@ -219,19 +212,19 @@ int connect_qp_client()
     /* change QP state to RTS */
     /* send qp_info to client */
     int peer_ind = -1;
-    int j = 0;
     log(LOG_SUB_HEADER, "IB Config");
     for (i = 0; i < num_peers; i++)
     {
-        peer_ind = -1;
-        for (j = 0; j < num_peers; j++)
-        {
-            if (remote_qp_info[j].rank == i)
-            {
-                peer_ind = j;
-                break;
-            }
-        }
+        /* peer_ind = -1; */
+        /* for (j = 0; j < num_peers; j++) */
+        /* { */
+        /*     if (remote_qp_info[j].rank == i) */
+        /*     { */
+        /*         peer_ind = j; */
+        /*         break; */
+        /*     } */
+        /* } */
+        peer_ind = 0;
 
         printf("Loca qp_num: %" PRIu32 ", Remote qp_num %" PRIu32 "\n", local_qp_info[peer_ind].qp_num,
                remote_qp_info[i].qp_num);
@@ -482,7 +475,7 @@ void close_ib_connection()
 
     if (config_info.peer_sockfds != NULL)
     {
-        for (i = 0; i < config_info.num_clients; i++)
+        for (i = 0; i < 1; i++)
         {
             if (config_info.peer_sockfds[i] > 0)
             {

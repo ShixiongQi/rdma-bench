@@ -41,7 +41,6 @@ struct QPInfo
 {
     uint16_t lid;
     uint32_t qp_num;
-    uint32_t rank;
     union ibv_gid gid;
     uint8_t sgid_index;
     uint8_t ib_port;

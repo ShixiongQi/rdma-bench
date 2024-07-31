@@ -18,14 +18,6 @@
 #define NUM_WARMING_UP_OPS 50000
 #define TOT_NUM_OPS 2000000
 
-enum ConfigFileAttr
-{
-    ATTR_SERVERS = 1,
-    ATTR_CLIENTS,
-    ATTR_MSG_SIZE,
-    ATTR_NUM_CONCURR_MSGS,
-    ATTR_BENCHMARK_TYPE,
-};
 
 enum BenchMarkType
 {
@@ -37,15 +29,12 @@ enum BenchMarkType
 
 struct ConfigInfo
 {
-    int num_clients;
-    char **clients; /* list of clients */
 
     char *server_ip;
     int self_sockfd;   /* self's socket fd */
     int *peer_sockfds; /* peers' socket fd */
 
     bool is_server; /* if the current node is server */
-    int rank;       /* the rank of the node */
 
     char name[64];
 

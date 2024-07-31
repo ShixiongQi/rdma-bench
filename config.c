@@ -90,56 +90,17 @@ int parse_node_list(char *line, char ***hosts)
     return numHosts;
 }
 
-int get_rank()
-{
-    int ret = 0;
-    uint32_t i = 0;
-    uint32_t num_clients = config_info.num_clients;
-    struct utsname utsname_buf;
-    char hostname[64];
-
-    /* get hostname */
-    ret = uname(&utsname_buf);
-    check(ret == 0, "Failed to call uname");
-
-    strncpy(hostname, utsname_buf.nodename, sizeof(hostname));
-
-    log_debug("local hostname: %s", hostname);
-
-    config_info.rank = -1;
-
-    for (i = 0; i < num_clients; i++)
-    {
-        if (strstr(hostname, config_info.clients[i]))
-        {
-            config_info.rank = i;
-            break;
-        }
-    }
-    check(config_info.rank >= 0, "Failed to get rank for node: %s", hostname);
-
-    return 0;
-error:
-    return -1;
-}
 
 void print_benchmark_cfg(struct ConfigInfo *config)
 {
 
-    printf("num_clients: %d\n", config->num_clients);
 
 
     printf("server_ip: %s\n", config->server_ip);
-    printf("Clients:\n");
-    for (int i = 0; i < config->num_clients; i++)
-    {
-        printf("  %s\n", config->clients[i]);
-    }
 
     printf("self_sockfd: %d\n", config->self_sockfd);
 
     printf("is_server: %s\n", config->is_server ? "true" : "false");
-    printf("rank: %d\n", config->rank);
     printf("name: %s\n", config->name);
     printf("msg_size: %d\n", config->msg_size);
     printf("num_concurr_msgs: %d\n", config->num_concurr_msgs);
@@ -305,20 +266,6 @@ error_1:
 
 void free_config_info(struct ConfigInfo *config_info)
 {
-    int num_clients = config_info->num_clients;
-    int i;
-
-    if (config_info->clients != NULL)
-    {
-        for (i = 0; i < num_clients; i++)
-        {
-            if (config_info->clients[i] != NULL)
-            {
-                free(config_info->clients[i]);
-            }
-        }
-        free(config_info->clients);
-    }
     free(config_info->server_ip);
     free(config_info->sock_port);
 }
@@ -331,7 +278,6 @@ void print_config_info()
     {
         log("is_server = %s", "true");
     }
-    log("rank                      = %d", config_info.rank);
     log("msg_size                  = %d", config_info.msg_size);
     log("num_concurr_msgs          = %d", config_info.num_concurr_msgs);
     log("sock_port                 = %s", config_info.sock_port);
