@@ -9,92 +9,13 @@
 
 struct ConfigInfo config_info;
 
-void init_config_info(struct ConfigInfo* config_info)
+void init_config_info(struct ConfigInfo *config_info)
 {
     config_info->is_server = true;
 }
 
-/* remove space, tab and line return from the line */
-void clean_up_line(char *line)
-{
-    char *i = line;
-    char *j = line;
-
-    while (*j != 0)
-    {
-        *i = *j;
-        j += 1;
-        if (*i != ' ' && *i != '\t' && *i != '\r' && *i != '\n')
-        {
-            i += 1;
-        }
-    }
-    *i = 0;
-}
-
-int parse_node_list(char *line, char ***hosts)
-{
-    int numHosts = 0;
-
-    // Create a temporary copy of the line
-    char *lineCopy = strdup(line);
-    if (lineCopy == NULL)
-    {
-        perror("Memory allocation error");
-        exit(1);
-    }
-
-    // Count the number of hostnames first
-    char *token = strtok(line, ",");
-    while (token != NULL)
-    {
-        if (strlen(token) > 0)
-        { // Check for empty tokens
-            numHosts++;
-        }
-        token = strtok(NULL, ",");
-    }
-
-    // Allocate memory for the hostnames
-    *hosts = (char **)malloc(numHosts * sizeof(char *));
-    if (*hosts == NULL)
-    {
-        perror("Memory allocation error");
-        exit(1);
-    }
-
-    // Reset the temporary line copy
-    strcpy(line, lineCopy);
-
-    // Copy hostnames to the hosts array
-    token = strtok(line, ",");
-    int index = 0;
-    while (token != NULL)
-    {
-        if (strlen(token) > 0)
-        { // Check for empty tokens
-            (*hosts)[index] = strdup(token);
-            if ((*hosts)[index] == NULL)
-            {
-                perror("Memory allocation error");
-                exit(1);
-            }
-            index++;
-        }
-        token = strtok(NULL, ",");
-    }
-
-    // Free the temporary copy of the line
-    free(lineCopy);
-
-    return numHosts;
-}
-
-
 void print_benchmark_cfg(struct ConfigInfo *config)
 {
-
-
 
     printf("server_ip: %s\n", config->server_ip);
 
@@ -262,7 +183,6 @@ int parse_benchmark_cfg(char *cfg_file, struct ConfigInfo *config_info)
 error_1:
     return -1;
 }
-
 
 void free_config_info(struct ConfigInfo *config_info)
 {

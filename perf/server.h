@@ -1,6 +1,7 @@
 #ifndef SERVER_H_
 #define SERVER_H_
 
-int run_server();
+#include "setup_ib.h"
+int run_server(struct IBRes *ib_res);
 
 #endif /* server.h */

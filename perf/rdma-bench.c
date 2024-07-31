@@ -1,7 +1,6 @@
 #include "client.h"
 #include "config.h"
 #include "debug.h"
-#include "ib.h"
 #include "server.h"
 #include "setup_ib.h"
 #include <getopt.h>
@@ -100,17 +99,18 @@ int main(int argc, char *argv[])
     ret = init_env();
     check(ret == 0, "Failed to init env");
 
-    ret = setup_ib();
+    struct IBRes ib_res;
+    ret = setup_ib(&ib_res);
     check(ret == 0, "Failed to setup IB");
 
     /* connect QP */
     if (config_info.is_server)
     {
-        ret = connect_qp_server();
+        ret = connect_qp_server(&ib_res);
     }
     else
     {
-        ret = connect_qp_client();
+        ret = connect_qp_client(&ib_res);
     }
 
     check(ret == 0, "Failed to connect qp");
@@ -118,17 +118,17 @@ int main(int argc, char *argv[])
     if (config_info.is_server)
     {
         printf("Running Server...\n");
-        ret = run_server();
+        ret = run_server(&ib_res);
     }
     else
     {
         printf("Running Client...\n");
-        ret = run_client();
+        ret = run_client(&ib_res);
     }
     check(ret == 0, "Failed to run workload");
 
 error:
-    close_ib_connection();
+    close_ib_connection(&ib_res);
     destroy_env();
     free_config_info(&config_info);
 #ifdef USE_RTE_MEMPOOL

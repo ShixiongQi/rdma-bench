@@ -1,6 +1,7 @@
 #ifndef CLIENT_H_
 #define CLIENT_H_
 
-int run_client();
+#include "setup_ib.h"
+int run_client(struct IBRes *ib_res);
 
 #endif /* client.h */

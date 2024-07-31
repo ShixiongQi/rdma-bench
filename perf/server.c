@@ -9,29 +9,34 @@
 #include "server.h"
 #include "setup_ib.h"
 
+struct args
+{
+    struct IBRes *ib_res;
+};
 void *server_thread_write_signaled(void *arg)
 {
-    assert(ib_res.num_qps == 1);
+    struct args *args = (struct args *)arg;
+    struct IBRes *ib_res = args->ib_res;
+    assert(ib_res->num_qps == 1);
     int ret = 0;
-    long thread_id = (long)arg;
     int msg_size = config_info.msg_size;
     int num_concurr_msgs = config_info.num_concurr_msgs;
 
-    struct ibv_qp **qp = ib_res.qp;
-    struct ibv_cq *cq = ib_res.cq;
-    struct ibv_srq *srq = ib_res.srq;
+    struct ibv_qp **qp = ib_res->qp;
+    struct ibv_cq *cq = ib_res->cq;
+    struct ibv_srq *srq = ib_res->srq;
     struct ibv_wc *wc = NULL;
-    uint32_t lkey = ib_res.mr->lkey;
+    uint32_t lkey = ib_res->mr->lkey;
 
-    char *buf_ptr = ib_res.ib_buf;
-    char *buf_base = ib_res.ib_buf;
+    char *buf_ptr = ib_res->ib_buf;
+    char *buf_base = ib_res->ib_buf;
     int buf_offset = 0;
-    size_t buf_size = ib_res.ib_buf_size;
+    size_t buf_size = ib_res->ib_buf_size;
 
     int num_completion = 0;
 
     wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
-    check(wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
+    check(wc != NULL, "thread: failed to allocate wc.");
 
     for (int j = 0; j < num_concurr_msgs; j++)
     {
@@ -92,26 +97,27 @@ error:
 
 void *server_thread_write_unsignaled(void *arg)
 {
-    assert(ib_res.num_qps == 1);
+    struct args *args = (struct args *)arg;
+    struct IBRes *ib_res = args->ib_res;
+    assert(ib_res->num_qps == 1);
     int ret = 0;
-    long thread_id = (long)arg;
     int msg_size = config_info.msg_size;
     int num_concurr_msgs = config_info.num_concurr_msgs;
 
-    struct ibv_cq *cq = ib_res.cq;
-    struct ibv_srq *srq = ib_res.srq;
+    struct ibv_cq *cq = ib_res->cq;
+    struct ibv_srq *srq = ib_res->srq;
     struct ibv_wc *wc = NULL;
-    uint32_t lkey = ib_res.mr->lkey;
+    uint32_t lkey = ib_res->mr->lkey;
 
-    char *buf_ptr = ib_res.ib_buf;
-    char *buf_base = ib_res.ib_buf;
+    char *buf_ptr = ib_res->ib_buf;
+    char *buf_base = ib_res->ib_buf;
     int buf_offset = 0;
-    size_t buf_size = ib_res.ib_buf_size;
+    size_t buf_size = ib_res->ib_buf_size;
 
     int num_completion = 0;
 
     wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
-    check(wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
+    check(wc != NULL, "thread: failed to allocate wc.");
 
     for (int j = 0; j < num_concurr_msgs; j++)
     {
@@ -161,22 +167,23 @@ error:
 
 void *server_thread_write_imm(void *arg)
 {
-    assert(ib_res.num_qps == 1);
+    struct args *args = (struct args *)arg;
+    struct IBRes *ib_res = args->ib_res;
+    assert(ib_res->num_qps == 1);
     int ret = 0;
-    long thread_id = (long)arg;
     int msg_size = config_info.msg_size;
     int num_concurr_msgs = config_info.num_concurr_msgs;
 
-    struct ibv_qp **qp = ib_res.qp;
-    struct ibv_cq *cq = ib_res.cq;
-    struct ibv_srq *srq = ib_res.srq;
+    struct ibv_qp **qp = ib_res->qp;
+    struct ibv_cq *cq = ib_res->cq;
+    struct ibv_srq *srq = ib_res->srq;
     struct ibv_wc *wc = NULL;
-    uint32_t lkey = ib_res.mr->lkey;
+    uint32_t lkey = ib_res->mr->lkey;
 
-    char *buf_ptr = ib_res.ib_buf;
-    char *buf_base = ib_res.ib_buf;
+    char *buf_ptr = ib_res->ib_buf;
+    char *buf_base = ib_res->ib_buf;
     int buf_offset = 0;
-    size_t buf_size = ib_res.ib_buf_size;
+    size_t buf_size = ib_res->ib_buf_size;
 
     bool stop = false;
     struct timeval start, end;
@@ -187,7 +194,7 @@ void *server_thread_write_imm(void *arg)
     int num_completion = 0;
 
     wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
-    check(wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
+    check(wc != NULL, "thread: failed to allocate wc.");
 
     for (int j = 0; j < num_concurr_msgs; j++)
     {
@@ -205,7 +212,7 @@ void *server_thread_write_imm(void *arg)
     printf("signal the client to start...\n");
 
     ret = post_send(0, lkey, 0, MSG_CTL_START, qp[0], buf_base);
-    check(ret == 0, "thread[%ld]: failed to signal the client to start", thread_id);
+    check(ret == 0, "thread: failed to signal the client to start");
 
     printf("signaled the client to start...\n");
     long int ops_count = 0;
@@ -248,8 +255,8 @@ void *server_thread_write_imm(void *arg)
         }
     }
 
-    ret = post_send(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[0], ib_res.ib_buf);
-    check(ret == 0, "thread[%ld]: failed to signal the client to stop", thread_id);
+    ret = post_send(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[0], ib_res->ib_buf);
+    check(ret == 0, "thread: failed to signal the client to stop");
 
     stop = false;
     while (!stop)
@@ -284,9 +291,9 @@ void *server_thread_write_imm(void *arg)
     throughput = (double)(ops_count - NUM_WARMING_UP_OPS) / duration;
 
     latency = duration * 1000000 / (double)(ops_count - NUM_WARMING_UP_OPS);
-    log_info("thread[%ld]: throughput = %f (ops/s)", thread_id, throughput);
-    printf("thread[%ld]: throughput = %f (ops/s) %f (Bytes/s); ops_count:%ld, duration: %f seconds \n", thread_id,
-           throughput, throughput * msg_size, ops_count, duration);
+    log_info("thread: throughput = %f (ops/s)", throughput);
+    printf("thread: throughput = %f (ops/s) %f (Bytes/s); ops_count:%ld, duration: %f seconds \n", throughput,
+           throughput * msg_size, ops_count, duration);
     printf("latency: %f\n", latency);
 
     free(wc);
@@ -298,25 +305,26 @@ error:
 
 void *server_thread_send(void *arg)
 {
+    struct args *args = (struct args *)arg;
+    struct IBRes *ib_res = args->ib_res;
     int ret = 0, i = 0, j = 0, n = 0;
-    long thread_id = (long)arg;
     int num_concurr_msgs = config_info.num_concurr_msgs;
     int msg_size = config_info.msg_size;
-    int num_peers = ib_res.num_qps;
+    int num_peers = ib_res->num_qps;
 
     pthread_t self;
     cpu_set_t cpuset;
 
-    struct ibv_qp **qp = ib_res.qp;
-    struct ibv_cq *cq = ib_res.cq;
-    struct ibv_srq *srq = ib_res.srq;
+    struct ibv_qp **qp = ib_res->qp;
+    struct ibv_cq *cq = ib_res->cq;
+    struct ibv_srq *srq = ib_res->srq;
     struct ibv_wc *wc = NULL;
-    uint32_t lkey = ib_res.mr->lkey;
+    uint32_t lkey = ib_res->mr->lkey;
 
-    char *buf_ptr = ib_res.ib_buf;
-    char *buf_base = ib_res.ib_buf;
+    char *buf_ptr = ib_res->ib_buf;
+    char *buf_base = ib_res->ib_buf;
     int buf_offset = 0;
-    size_t buf_size = ib_res.ib_buf_size;
+    size_t buf_size = ib_res->ib_buf_size;
 
     uint32_t imm_data = 0;
     int num_acked_peers = 0;
@@ -327,18 +335,16 @@ void *server_thread_send(void *arg)
     double throughput = 0.0;
 
     wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
-    check(wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
+    check(wc != NULL, "thread: failed to allocate wc.");
 
     /* set thread affinity */
-    CPU_ZERO(&cpuset);
-    CPU_SET((int)thread_id, &cpuset);
     self = pthread_self();
     ret = pthread_setaffinity_np(self, sizeof(cpu_set_t), &cpuset);
-    check(ret == 0, "thread[%ld]: failed to set thread affinity", thread_id);
+    check(ret == 0, "thread: failed to set thread affinity");
 
     /* pre-post recvs */
     wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
-    check(wc != NULL, "thread[%ld]: failed to allocate wc.", thread_id);
+    check(wc != NULL, "thread: failed to allocate wc.");
 
     for (i = 0; i < num_peers; i++)
     {
@@ -356,7 +362,7 @@ void *server_thread_send(void *arg)
     for (i = 0; i < num_peers; i++)
     {
         ret = post_send(0, lkey, 0, MSG_CTL_START, qp[i], buf_base);
-        check(ret == 0, "thread[%ld]: failed to signal the client to start", thread_id);
+        check(ret == 0, "thread: failed to signal the client to start");
     }
     log_debug("wait for client");
 
@@ -366,7 +372,7 @@ void *server_thread_send(void *arg)
         n = ibv_poll_cq(cq, NUM_WC, wc);
         if (n < 0)
         {
-            check(0, "thread[%ld]: Failed to poll cq", thread_id);
+            check(0, "thread: Failed to poll cq");
         }
 
         for (i = 0; i < n; i++)
@@ -375,11 +381,11 @@ void *server_thread_send(void *arg)
             {
                 if (wc[i].opcode == IBV_WC_SEND)
                 {
-                    check(0, "thread[%ld]: send failed status: %s", thread_id, ibv_wc_status_str(wc[i].status));
+                    check(0, "thread: send failed status: %s", ibv_wc_status_str(wc[i].status));
                 }
                 else
                 {
-                    check(0, "thread[%ld]: recv failed status: %s", thread_id, ibv_wc_status_str(wc[i].status));
+                    check(0, "thread: recv failed status: %s", ibv_wc_status_str(wc[i].status));
                 }
             }
 
@@ -413,8 +419,8 @@ void *server_thread_send(void *arg)
     /* signal the client to stop */
     for (i = 0; i < num_peers; i++)
     {
-        ret = post_send(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[i], ib_res.ib_buf);
-        check(ret == 0, "thread[%ld]: failed to signal the client to stop", thread_id);
+        ret = post_send(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[i], ib_res->ib_buf);
+        check(ret == 0, "thread: failed to signal the client to stop");
     }
 
     stop = false;
@@ -424,7 +430,7 @@ void *server_thread_send(void *arg)
         n = ibv_poll_cq(cq, NUM_WC, wc);
         if (n < 0)
         {
-            check(0, "thread[%ld]: Failed to poll cq", thread_id);
+            check(0, "thread: Failed to poll cq");
         }
 
         for (i = 0; i < n; i++)
@@ -433,11 +439,11 @@ void *server_thread_send(void *arg)
             {
                 if (wc[i].opcode == IBV_WC_SEND)
                 {
-                    check(0, "thread[%ld]: send failed status: %s", thread_id, ibv_wc_status_str(wc[i].status));
+                    check(0, "thread: send failed status: %s", ibv_wc_status_str(wc[i].status));
                 }
                 else
                 {
-                    check(0, "thread[%ld]: recv failed status: %s", thread_id, ibv_wc_status_str(wc[i].status));
+                    check(0, "thread: recv failed status: %s", ibv_wc_status_str(wc[i].status));
                 }
             }
 
@@ -460,9 +466,9 @@ void *server_thread_send(void *arg)
     duration = (double)((end.tv_sec - start.tv_sec) + (double)(end.tv_usec - start.tv_usec) / 1000000);
     throughput = (double)(ops_count - NUM_WARMING_UP_OPS) / duration;
 
-    log("thread[%ld]: throughput = %f (ops/s)", thread_id, throughput);
-    printf("thread[%ld]: throughput = %f (ops/s) %f (Bytes/s); ops_count:%ld, duration: %f seconds \n", thread_id,
-           throughput, throughput * msg_size, ops_count, duration);
+    log("thread: throughput = %f (ops/s)", throughput);
+    printf("thread: throughput = %f (ops/s) %f (Bytes/s); ops_count:%ld, duration: %f seconds \n", throughput,
+           throughput * msg_size, ops_count, duration);
 
     free(wc);
     pthread_exit((void *)0);
@@ -475,11 +481,9 @@ error:
     pthread_exit((void *)-1);
 }
 
-int run_server()
+int run_server(struct IBRes *ib_res)
 {
     int ret = 0;
-    long num_threads = 1;
-    long i = 0;
 
     pthread_t *threads = NULL;
     pthread_attr_t attr;
@@ -490,7 +494,7 @@ int run_server()
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
-    threads = (pthread_t *)calloc(num_threads, sizeof(pthread_t));
+    threads = (pthread_t *)malloc(sizeof(pthread_t));
     check(threads != NULL, "Failed to allocate threads.");
 
     if (benchmark_type == SEND)
@@ -514,22 +518,17 @@ int run_server()
         log_error("The benchmark_type is illegal, %d", benchmark_type);
     }
 
-    for (i = 0; i < num_threads; i++)
-    {
-        ret = pthread_create(&threads[i], &attr, server_thread_func, (void *)i);
-        check(ret == 0, "Failed to create server_thread[%ld]", i);
-    }
+    struct args args = {.ib_res = ib_res};
+    ret = pthread_create(threads, &attr, server_thread_func, &args);
+    check(ret == 0, "Failed to create server_thread");
 
     bool thread_ret_normally = true;
-    for (i = 0; i < num_threads; i++)
+    ret = pthread_join(*threads, &status);
+    check(ret == 0, "Failed to join thread.");
+    if ((long)status != 0)
     {
-        ret = pthread_join(threads[i], &status);
-        check(ret == 0, "Failed to join thread[%ld].", i);
-        if ((long)status != 0)
-        {
-            thread_ret_normally = false;
-            log("server_thread[%ld]: failed to execute", i);
-        }
+        thread_ret_normally = false;
+        log("server_thread: failed to execute");
     }
 
     if (thread_ret_normally == false)

@@ -13,9 +13,7 @@
 #include "setup_ib.h"
 #include "sock.h"
 
-struct IBRes ib_res;
-
-int connect_qp_server()
+int connect_qp_server(struct IBRes *ib_res)
 {
     int ret = 0, n = 0, i = 0;
     /* int num_peers = config_info.num_clients; */
@@ -45,15 +43,15 @@ int connect_qp_server()
 
     for (i = 0; i < num_peers; i++)
     {
-        local_qp_info[i].lid = ib_res.port_attr.lid;
-        local_qp_info[i].qp_num = ib_res.qp[i]->qp_num;
+        local_qp_info[i].lid = ib_res->port_attr.lid;
+        local_qp_info[i].qp_num = ib_res->qp[i]->qp_num;
         /* local_qp_info[i].rank = config_info.rank; */
         local_qp_info[i].sgid_index = config_info.sgid_index;
-        local_qp_info[i].gid = ib_res.sgid;
+        local_qp_info[i].gid = ib_res->sgid;
         local_qp_info[i].ib_port = config_info.ib_port;
-        local_qp_info[i].rkey = ib_res.mr->rkey;
-        local_qp_info[i].raddr = (uint64_t)ib_res.mr->addr;
-        local_qp_info[i].rsize = ib_res.mr->length;
+        local_qp_info[i].rkey = ib_res->mr->rkey;
+        local_qp_info[i].raddr = (uint64_t)ib_res->mr->addr;
+        local_qp_info[i].rsize = ib_res->mr->length;
         local_qp_info[i].psn = 0;
     }
 
@@ -68,9 +66,9 @@ int connect_qp_server()
     }
     // TODO temporary setting for one server one client benchmark
     assert(num_peers == 1);
-    ib_res.raddr = remote_qp_info[0].raddr;
-    ib_res.rkey = remote_qp_info[0].rkey;
-    ib_res.rsize = remote_qp_info[0].rsize;
+    ib_res->raddr = remote_qp_info[0].raddr;
+    ib_res->rkey = remote_qp_info[0].rkey;
+    ib_res->rsize = remote_qp_info[0].rsize;
 
     /* send qp_info to client */
     int peer_ind = -1;
@@ -85,15 +83,6 @@ int connect_qp_server()
     log(LOG_SUB_HEADER, "Start of IB Config");
     for (i = 0; i < num_peers; i++)
     {
-        /* peer_ind = -1; */
-        /* for (j = 0; j < num_peers; j++) */
-        /* { */
-        /*     if (remote_qp_info[j].rank == i) */
-        /*     { */
-        /*         peer_ind = j; */
-        /*         break; */
-        /*     } */
-        /* } */
         peer_ind = 0;
 
         printf("Loca qp_num: %" PRIu32 ", Remote qp_num %" PRIu32 "\n", local_qp_info[peer_ind].qp_num,
@@ -106,9 +95,9 @@ int connect_qp_server()
         print_qp_info(&remote_qp_info[i]);
         printf("\n");
 
-        ret = modify_qp_to_rts(ib_res.qp[peer_ind], &local_qp_info[peer_ind], &remote_qp_info[i]);
+        ret = modify_qp_to_rts(ib_res->qp[peer_ind], &local_qp_info[peer_ind], &remote_qp_info[i]);
         check(ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
-        log("\tLocal qp[%" PRIu32 "] <-> Remote qp[%" PRIu32 "]", ib_res.qp[peer_ind]->qp_num,
+        log("\tLocal qp[%" PRIu32 "] <-> Remote qp[%" PRIu32 "]", ib_res->qp[peer_ind]->qp_num,
             remote_qp_info[i].qp_num);
     }
     log(LOG_SUB_HEADER, "End of IB Config");
@@ -148,7 +137,7 @@ error:
     return -1;
 }
 
-int connect_qp_client()
+int connect_qp_client(struct IBRes *ib_res)
 {
     int ret = 0, n = 0, i = 0;
     int num_peers = 1;
@@ -174,15 +163,15 @@ int connect_qp_client()
 
     for (i = 0; i < num_peers; i++)
     {
-        local_qp_info[i].lid = ib_res.port_attr.lid;
-        local_qp_info[i].qp_num = ib_res.qp[i]->qp_num;
+        local_qp_info[i].lid = ib_res->port_attr.lid;
+        local_qp_info[i].qp_num = ib_res->qp[i]->qp_num;
         /* local_qp_info[i].rank = config_info.rank; */
         local_qp_info[i].sgid_index = config_info.sgid_index;
-        local_qp_info[i].gid = ib_res.sgid;
+        local_qp_info[i].gid = ib_res->sgid;
         local_qp_info[i].ib_port = config_info.ib_port;
-        local_qp_info[i].rkey = ib_res.mr->rkey;
-        local_qp_info[i].raddr = (uint64_t)ib_res.mr->addr;
-        local_qp_info[i].rsize = ib_res.mr->length;
+        local_qp_info[i].rkey = ib_res->mr->rkey;
+        local_qp_info[i].raddr = (uint64_t)ib_res->mr->addr;
+        local_qp_info[i].rsize = ib_res->mr->length;
         local_qp_info[i].psn = 0;
     }
 
@@ -205,9 +194,9 @@ int connect_qp_client()
 
     // TODO temporary setting for one server one client benchmark
     assert(num_peers == 1);
-    ib_res.raddr = remote_qp_info[0].raddr;
-    ib_res.rkey = remote_qp_info[0].rkey;
-    ib_res.rsize = remote_qp_info[0].rsize;
+    ib_res->raddr = remote_qp_info[0].raddr;
+    ib_res->rkey = remote_qp_info[0].rkey;
+    ib_res->rsize = remote_qp_info[0].rsize;
 
     /* change QP state to RTS */
     /* send qp_info to client */
@@ -215,15 +204,6 @@ int connect_qp_client()
     log(LOG_SUB_HEADER, "IB Config");
     for (i = 0; i < num_peers; i++)
     {
-        /* peer_ind = -1; */
-        /* for (j = 0; j < num_peers; j++) */
-        /* { */
-        /*     if (remote_qp_info[j].rank == i) */
-        /*     { */
-        /*         peer_ind = j; */
-        /*         break; */
-        /*     } */
-        /* } */
         peer_ind = 0;
 
         printf("Loca qp_num: %" PRIu32 ", Remote qp_num %" PRIu32 "\n", local_qp_info[peer_ind].qp_num,
@@ -236,9 +216,9 @@ int connect_qp_client()
         print_qp_info(&remote_qp_info[i]);
         printf("\n");
 
-        ret = modify_qp_to_rts(ib_res.qp[peer_ind], &local_qp_info[peer_ind], &remote_qp_info[i]);
+        ret = modify_qp_to_rts(ib_res->qp[peer_ind], &local_qp_info[peer_ind], &remote_qp_info[i]);
         check(ret == 0, "Failed to modify qp[%d] to rts", peer_ind);
-        log("\tLocal qp[%" PRIu32 "] <-> Remote qp[%" PRIu32 "]", ib_res.qp[peer_ind]->qp_num,
+        log("\tLocal qp[%" PRIu32 "] <-> Remote qp[%" PRIu32 "]", ib_res->qp[peer_ind]->qp_num,
             remote_qp_info[i].qp_num);
     }
     log(LOG_SUB_HEADER, "End of IB Config");
@@ -320,38 +300,38 @@ error_0:
 }
 #endif
 
-int setup_ib()
+int setup_ib(struct IBRes *ib_res)
 {
     int ret = 0;
     int i = 0;
     int num_devices = 0;
     struct ibv_device **dev_list = NULL;
-    memset(&ib_res, 0, sizeof(struct IBRes));
+    memset(ib_res, 0, sizeof(struct IBRes));
 
-    ib_res.num_qps = 1;
+    ib_res->num_qps = 1;
     /* get IB device list */
     dev_list = ibv_get_device_list(&num_devices);
     check(dev_list != NULL, "Failed to get ib device list.");
 
     /* create IB context */
-    ib_res.ctx = ibv_open_device(dev_list[config_info.dev_index]);
-    check(ib_res.ctx != NULL, "Failed to open ib device.");
+    ib_res->ctx = ibv_open_device(dev_list[config_info.dev_index]);
+    check(ib_res->ctx != NULL, "Failed to open ib device.");
 
     /* allocate protection domain */
-    ib_res.pd = ibv_alloc_pd(ib_res.ctx);
-    check(ib_res.pd != NULL, "Failed to allocate protection domain.");
+    ib_res->pd = ibv_alloc_pd(ib_res->ctx);
+    check(ib_res->pd != NULL, "Failed to allocate protection domain.");
 
     /* query IB port attribute */
-    ret = ibv_query_port(ib_res.ctx, config_info.ib_port, &ib_res.port_attr);
+    ret = ibv_query_port(ib_res->ctx, config_info.ib_port, &ib_res->port_attr);
     check(ret == 0, "Failed to query IB port information.");
 
     /* query GID (RoCEv2) */
-    if (ib_res.port_attr.lid == 0 && ib_res.port_attr.link_layer == IBV_LINK_LAYER_ETHERNET)
+    if (ib_res->port_attr.lid == 0 && ib_res->port_attr.link_layer == IBV_LINK_LAYER_ETHERNET)
     {
-        ret = ibv_query_gid(ib_res.ctx, config_info.ib_port, config_info.sgid_index, &ib_res.sgid);
+        ret = ibv_query_gid(ib_res->ctx, config_info.ib_port, config_info.sgid_index, &ib_res->sgid);
         check(!ret, "Failed to query GID.");
 
-        print_ibv_gid(ib_res.sgid);
+        print_ibv_gid(ib_res->sgid);
     }
 
     /* register mr */
@@ -359,35 +339,35 @@ int setup_ib()
     /* the recv buffer occupies the first half while the sending buffer */
     /* occupies the second half */
     /* assume all msgs are of the same content */
-    ib_res.ib_buf_size = config_info.msg_size * config_info.num_concurr_msgs * ib_res.num_qps;
+    ib_res->ib_buf_size = config_info.msg_size * config_info.num_concurr_msgs * ib_res->num_qps;
 #ifdef USE_RTE_MEMPOOL
-    ib_res.ib_buf = (char *)rte_shm_mgr(ib_res.ib_buf_size);
+    ib_res->ib_buf = (char *)rte_shm_mgr(ib_res->ib_buf_size);
 #else
-    ib_res.ib_buf = (char *)memalign(4096, ib_res.ib_buf_size);
+    ib_res->ib_buf = (char *)memalign(4096, ib_res->ib_buf_size);
 #endif
-    check(ib_res.ib_buf != NULL, "Failed to allocate ib_buf");
+    check(ib_res->ib_buf != NULL, "Failed to allocate ib_buf");
 
-    ib_res.mr = ibv_reg_mr(ib_res.pd, (void *)ib_res.ib_buf, ib_res.ib_buf_size,
-                           IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE);
-    check(ib_res.mr != NULL, "Failed to register mr");
+    ib_res->mr = ibv_reg_mr(ib_res->pd, (void *)ib_res->ib_buf, ib_res->ib_buf_size,
+                            IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE);
+    check(ib_res->mr != NULL, "Failed to register mr");
 
     /* query IB device attr */
-    ret = ibv_query_device(ib_res.ctx, &ib_res.dev_attr);
+    ret = ibv_query_device(ib_res->ctx, &ib_res->dev_attr);
     check(ret == 0, "Failed to query device");
 
     /* create cq */
-    ib_res.cq = ibv_create_cq(ib_res.ctx, ib_res.dev_attr.max_cqe - 1, NULL, NULL, 0);
-    check(ib_res.cq != NULL, "Failed to create cq");
+    ib_res->cq = ibv_create_cq(ib_res->ctx, ib_res->dev_attr.max_cqe - 1, NULL, NULL, 0);
+    check(ib_res->cq != NULL, "Failed to create cq");
 
-    assert(ib_res.dev_attr.max_srq != 0);
+    assert(ib_res->dev_attr.max_srq != 0);
     /* create srq */
     struct ibv_srq_init_attr srq_init_attr = {
-        .attr.max_wr = ib_res.dev_attr.max_srq_wr,
+        .attr.max_wr = ib_res->dev_attr.max_srq_wr,
         .attr.max_sge = 1,
     };
 
-    ib_res.srq = ibv_create_srq(ib_res.pd, &srq_init_attr);
-    if (unlikely(!ib_res.srq))
+    ib_res->srq = ibv_create_srq(ib_res->pd, &srq_init_attr);
+    if (unlikely(!ib_res->srq))
     {
         log_error("Failed to create shared receive queue");
         goto error;
@@ -396,15 +376,15 @@ int setup_ib()
     /* create qp */
     // when srq is used, the max_recv_wr and max_recv_sge is ignored
     struct ibv_qp_init_attr qp_init_attr = {
-        .send_cq = ib_res.cq,
-        .recv_cq = ib_res.cq,
-        .srq = ib_res.srq,
+        .send_cq = ib_res->cq,
+        .recv_cq = ib_res->cq,
+        .srq = ib_res->srq,
         .cap =
             {
                 // TODO add retry to determine the max_send_wr
                 .max_send_wr = 64,
                 .max_recv_wr = 64,
-                /* .max_recv_wr = ib_res.dev_attr.max_qp_wr, */
+                /* .max_recv_wr = ib_res->dev_attr.max_qp_wr, */
                 .max_send_sge = 1,
                 .max_recv_sge = 1,
                 /* .max_recv_sge = 1, */
@@ -412,13 +392,13 @@ int setup_ib()
         .qp_type = IBV_QPT_RC,
     };
 
-    ib_res.qp = (struct ibv_qp **)calloc(ib_res.num_qps, sizeof(struct ibv_qp *));
-    check(ib_res.qp != NULL, "Failed to allocate qp array");
+    ib_res->qp = (struct ibv_qp **)calloc(ib_res->num_qps, sizeof(struct ibv_qp *));
+    check(ib_res->qp != NULL, "Failed to allocate qp array");
 
-    for (i = 0; i < ib_res.num_qps; i++)
+    for (i = 0; i < ib_res->num_qps; i++)
     {
-        ib_res.qp[i] = ibv_create_qp(ib_res.pd, &qp_init_attr);
-        check(ib_res.qp[i] != NULL, "Failed to create qp[%d]", i);
+        ib_res->qp[i] = ibv_create_qp(ib_res->pd, &qp_init_attr);
+        check(ib_res->qp[i] != NULL, "Failed to create qp[%d]", i);
     }
 
     ibv_free_device_list(dev_list);
@@ -432,45 +412,45 @@ error:
     return -1;
 }
 
-void close_ib_connection()
+void close_ib_connection(struct IBRes *ib_res)
 {
     int i;
 
-    if (ib_res.qp != NULL)
+    if (ib_res->qp != NULL)
     {
-        for (i = 0; i < ib_res.num_qps; i++)
+        for (i = 0; i < ib_res->num_qps; i++)
         {
-            if (ib_res.qp[i] != NULL)
+            if (ib_res->qp[i] != NULL)
             {
-                ibv_destroy_qp(ib_res.qp[i]);
+                ibv_destroy_qp(ib_res->qp[i]);
             }
         }
-        free(ib_res.qp);
+        free(ib_res->qp);
     }
 
-    if (ib_res.srq != NULL)
+    if (ib_res->srq != NULL)
     {
-        ibv_destroy_srq(ib_res.srq);
+        ibv_destroy_srq(ib_res->srq);
     }
 
-    if (ib_res.cq != NULL)
+    if (ib_res->cq != NULL)
     {
-        ibv_destroy_cq(ib_res.cq);
+        ibv_destroy_cq(ib_res->cq);
     }
 
-    if (ib_res.mr != NULL)
+    if (ib_res->mr != NULL)
     {
-        ibv_dereg_mr(ib_res.mr);
+        ibv_dereg_mr(ib_res->mr);
     }
 
-    if (ib_res.pd != NULL)
+    if (ib_res->pd != NULL)
     {
-        ibv_dealloc_pd(ib_res.pd);
+        ibv_dealloc_pd(ib_res->pd);
     }
 
-    if (ib_res.ctx != NULL)
+    if (ib_res->ctx != NULL)
     {
-        ibv_close_device(ib_res.ctx);
+        ibv_close_device(ib_res->ctx);
     }
 
     if (config_info.peer_sockfds != NULL)
@@ -489,12 +469,12 @@ void close_ib_connection()
         close(config_info.self_sockfd);
     }
 
-    if (ib_res.ib_buf != NULL)
+    if (ib_res->ib_buf != NULL)
     {
 #ifdef USE_RTE_MEMPOOL
-        rte_mempool_put(config_info.mempool, ib_res.ib_buf);
+        rte_mempool_put(config_info.mempool, ib_res->ib_buf);
 #else
-        free(ib_res.ib_buf);
+        free(ib_res->ib_buf);
 #endif
     }
 

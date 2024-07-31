@@ -18,7 +18,6 @@
 #define NUM_WARMING_UP_OPS 50000
 #define TOT_NUM_OPS 2000000
 
-
 enum BenchMarkType
 {
     SEND = 1,
@@ -67,8 +66,8 @@ struct ConfigInfo
 
 extern struct ConfigInfo config_info;
 
-void init_config_info(struct ConfigInfo* config);
-void free_config_info(struct ConfigInfo* config);
+void init_config_info(struct ConfigInfo *config);
+void free_config_info(struct ConfigInfo *config);
 int parse_benchmark_cfg(char *cfg_file, struct ConfigInfo *config);
 void print_benchmark_cfg(struct ConfigInfo *config);
 void print_config_info();
