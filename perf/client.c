@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include <libconfig.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <sys/time.h>
@@ -186,7 +187,7 @@ void *client_thread_write_unsignaled(void *arg)
     assert(ib_res->num_qps == 1);
     int ret = 0;
     int msg_size = config_info.msg_size;
-    int num_concurr_msgs = config_info.num_concurr_msgs;
+    /* int num_concurr_msgs = config_info.num_concurr_msgs; */
 
     struct ibv_qp **qp = ib_res->qp;
     struct ibv_cq *cq = ib_res->cq;
@@ -215,7 +216,7 @@ void *client_thread_write_unsignaled(void *arg)
     wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
     check(wc != NULL, "thread: failed to allocate wc.");
 
-    for (int j = 0; j < num_concurr_msgs; j++)
+    for (int j = 0; j < 40; j++)
     {
         ret = post_srq_recv(msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
         if (unlikely(ret != 0))
@@ -455,7 +456,6 @@ void *client_thread_send_signaled(void *arg)
     int ret = 0, n = 0;
     int msg_size = config_info.msg_size;
     int num_concurr_msgs = config_info.num_concurr_msgs;
-    int num_peers = 1;
 
     struct ibv_qp **qp = ib_res->qp;
     struct ibv_cq *cq = ib_res->cq;
@@ -468,32 +468,27 @@ void *client_thread_send_signaled(void *arg)
     int buf_offset = 0;
     size_t buf_size = ib_res->ib_buf_size;
 
-    uint32_t imm_data = 0;
-    int num_acked_peers = 0;
     bool start_sending = false;
-    bool stop = false;
     struct timeval start, end;
     long ops_count = 0;
     double duration = 0.0;
     double throughput = 0.0;
+    double latency = 0.0;
 
     /* pre-post recvs */
     wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
     check(wc != NULL, "thread: failed to allocate wc.");
 
-    for (int i = 0; i < num_peers; i++)
+    for (int j = 0; j < num_concurr_msgs; j++)
     {
-        for (int j = 0; j < num_concurr_msgs; j++)
+        ret = post_srq_recv(msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
+        if (unlikely(ret != 0))
         {
-            ret = post_srq_recv(msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
-            if (unlikely(ret != 0))
-            {
-                log_error("post shared receive request fail");
-                goto error;
-            }
-            buf_offset = (buf_offset + msg_size) % buf_size;
-            buf_ptr = buf_base + buf_offset;
+            log_error("post shared receive request fail");
+            goto error;
         }
+        buf_offset = (buf_offset + msg_size) % buf_size;
+        buf_ptr = buf_base + buf_offset;
     }
 
     printf("Client thread wait for start signal...\n");
@@ -515,17 +510,13 @@ void *client_thread_send_signaled(void *arg)
             if (wc[i].opcode == IBV_WC_RECV)
             {
                 /* post a receive */
-                post_srq_recv(msg_size, lkey, wc[i].wr_id, srq, (char *)wc[i].wr_id);
+                post_srq_recv(msg_size, lkey, wc[i].wr_id, srq, buf_ptr);
 
                 if (ntohl(wc[i].imm_data) == MSG_CTL_START)
                 {
                     log_debug("received start signal");
-                    num_acked_peers += 1;
-                    if (num_acked_peers == num_peers)
-                    {
-                        start_sending = true;
-                        break;
-                    }
+                    start_sending = true;
+                    break;
                 }
             }
         }
@@ -536,23 +527,16 @@ void *client_thread_send_signaled(void *arg)
     /* pre-post sends */
     buf_offset = 0;
     log_debug("buf_ptr = %" PRIx64 "", (uint64_t)buf_ptr);
-    for (int i = 0; i < num_peers; i++)
-    {
-        for (int j = 0; j < num_concurr_msgs; j++)
-        {
-            ret = post_send_signaled(msg_size, lkey, (uint64_t)buf_ptr, (uint32_t)i, qp[i], buf_ptr);
-            check(ret == 0, "thread: failed to post send");
-            buf_offset = (buf_offset + msg_size) % buf_size;
-            buf_ptr = buf_base + buf_offset;
-        }
-    }
 
-    log_debug("pre-post send finished");
-    num_acked_peers = 0;
-    while (stop != true)
+    bool stop = false;
+    while (!stop)
     {
+        ret = post_send_signaled(msg_size, lkey, (uint64_t)buf_ptr, 1, *qp, buf_ptr);
         /* poll cq */
-        n = ibv_poll_cq(cq, NUM_WC, wc);
+        do
+        {
+            n = ibv_poll_cq(cq, NUM_WC, wc);
+        } while (n == 0);
         if (n < 0)
         {
             check(0, "thread: Failed to poll cq");
@@ -578,42 +562,32 @@ void *client_thread_send_signaled(void *arg)
             {
                 ops_count += 1;
 
-                if (ops_count == NUM_WARMING_UP_OPS)
+                if (ops_count == config_info.warm_up_iter)
                 {
                     gettimeofday(&start, NULL);
                 }
 
-                imm_data = ntohl(wc[i].imm_data);
-                char *msg_ptr = (char *)wc[i].wr_id;
-
-                if (imm_data == MSG_CTL_STOP)
+                if (ops_count == config_info.total_iter)
                 {
-                    num_acked_peers += 1;
-                    if (num_acked_peers == num_peers)
-                    {
-                        gettimeofday(&end, NULL);
-                        stop = true;
-                        break;
-                    }
-                }
-                else
-                {
-                    /* echo the message back */
-                    post_send_signaled(msg_size, lkey, 0, imm_data, qp[imm_data], msg_ptr);
+                    gettimeofday(&end, NULL);
+                    stop = true;
+                    break;
                 }
 
                 /* post a new receive */
-                ret = post_srq_recv(msg_size, lkey, wc[i].wr_id, srq, msg_ptr);
             }
+            /* ret = post_srq_recv(msg_size, lkey, wc[i].wr_id, srq, buf_ptr); */
         } /* loop through all wc */
     }
 
     /* dump statistics */
     duration = (double)((end.tv_sec - start.tv_sec) + (double)(end.tv_usec - start.tv_usec) / 1000000);
-    throughput = (double)(ops_count - NUM_WARMING_UP_OPS) / duration;
+    throughput = (double)(config_info.total_iter - config_info.warm_up_iter) / duration;
+    latency = duration / (double)(config_info.total_iter - config_info.warm_up_iter);
 
     log("thread: throughput = %f (ops/s)", throughput);
     printf("thread: throughput = %f (ops/s) %f (Bytes/s)\n", throughput, throughput * msg_size);
+    printf("latency: %f", latency);
 
     free(wc);
     pthread_exit((void *)0);
@@ -633,7 +607,7 @@ void *client_thread_send_unsignaled(void *arg)
     assert(ib_res->num_qps == 1);
     int ret = 0;
     int msg_size = config_info.msg_size;
-    int num_concurr_msgs = config_info.num_concurr_msgs;
+    /* int num_concurr_msgs = config_info.num_concurr_msgs; */
 
     struct ibv_qp **qp = ib_res->qp;
     struct ibv_cq *cq = ib_res->cq;
@@ -645,6 +619,7 @@ void *client_thread_send_unsignaled(void *arg)
     char *buf_base = ib_res->ib_buf;
     int buf_offset = 0;
     size_t buf_size = ib_res->ib_buf_size;
+    assert(buf_size % msg_size == 0);
     int num_completion = 0;
 
     struct timeval start, end;
@@ -655,7 +630,7 @@ void *client_thread_send_unsignaled(void *arg)
     wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
     check(wc != NULL, "thread: failed to allocate wc.");
 
-    for (int j = 0; j < num_concurr_msgs; j++)
+    for (int j = 0; j < config_info.num_concurr_msgs; j++)
     {
         ret = post_srq_recv(msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
         if (unlikely(ret != 0))
@@ -757,7 +732,7 @@ void *client_thread_send_unsignaled(void *arg)
     printf("latency: %f for %d unsignaled operations plus a signaled operation\n", latency, signal_freq);
     printf("throughput: %f (Bytes/s)\n", throughput);
 
-    ret = post_send_signaled(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[0], ib_res->ib_buf);
+    ret = post_send_signaled(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[0], buf_ptr);
     bool finish = false;
     while (!finish)
     {
@@ -833,16 +808,13 @@ int run_client(struct IBRes *ib_res)
     struct args args = {.ib_res = ib_res};
 
     ret = pthread_create(client_threads, &attr, client_thread_func, &args);
-    check(ret == 0, "Failed to create client_thread");
-
-    bool thread_ret_normally = true;
-    ret = pthread_join(*client_threads, &status);
-    if ((long)status != 0)
+    if (unlikely(ret != 0))
     {
-        thread_ret_normally = false;
+        log_error("Failed to create client thread");
     }
 
-    if (thread_ret_normally == false)
+    ret = pthread_join(*client_threads, &status);
+    if ((long)status != 0)
     {
         goto error;
     }

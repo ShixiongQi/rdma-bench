@@ -312,7 +312,6 @@ void *server_thread_send_signaled(void *arg)
     int ret = 0, i = 0, j = 0, n = 0;
     int num_concurr_msgs = config_info.num_concurr_msgs;
     int msg_size = config_info.msg_size;
-    int num_peers = ib_res->num_qps;
 
     struct ibv_qp **qp = ib_res->qp;
     struct ibv_cq *cq = ib_res->cq;
@@ -325,13 +324,7 @@ void *server_thread_send_signaled(void *arg)
     int buf_offset = 0;
     size_t buf_size = ib_res->ib_buf_size;
 
-    uint32_t imm_data = 0;
-    int num_acked_peers = 0;
     bool stop = false;
-    struct timeval start, end;
-    long ops_count = 0;
-    double duration = 0.0;
-    double throughput = 0.0;
 
     wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
     check(wc != NULL, "thread: failed to allocate wc.");
@@ -340,24 +333,18 @@ void *server_thread_send_signaled(void *arg)
     wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
     check(wc != NULL, "thread: failed to allocate wc.");
 
-    for (i = 0; i < num_peers; i++)
+    for (j = 0; j < num_concurr_msgs; j++)
     {
-        for (j = 0; j < num_concurr_msgs; j++)
-        {
-            ret = post_srq_recv(msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
-            buf_offset = (buf_offset + msg_size) % buf_size;
-            buf_ptr = buf_base + buf_offset;
-        }
+        ret = post_srq_recv(msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
+        buf_offset = (buf_offset + msg_size) % buf_size;
+        buf_ptr = buf_base + buf_offset;
     }
 
     /* signal the client to start */
     printf("signal the client to start...\n");
 
-    for (i = 0; i < num_peers; i++)
-    {
-        ret = post_send_signaled(0, lkey, 0, MSG_CTL_START, qp[i], buf_base);
-        check(ret == 0, "thread: failed to signal the client to start");
-    }
+    ret = post_send_signaled(0, lkey, 0, MSG_CTL_START, *qp, buf_base);
+    check(ret == 0, "thread: failed to signal the client to start");
     log_debug("wait for client");
 
     while (stop != true)
@@ -385,85 +372,16 @@ void *server_thread_send_signaled(void *arg)
 
             if (wc[i].opcode == IBV_WC_RECV)
             {
-                ops_count += 1;
-
-                if (ops_count == NUM_WARMING_UP_OPS)
+                if ((wc[i].wc_flags & IBV_WC_WITH_IMM) && (ntohl(wc[i].imm_data) == MSG_CTL_STOP))
                 {
-                    gettimeofday(&start, NULL);
-                }
-                if (ops_count == TOT_NUM_OPS)
-                {
-                    gettimeofday(&end, NULL);
                     stop = true;
-                    break;
-                }
-
-                /* echo the message back */
-                imm_data = ntohl(wc[i].imm_data);
-                char *msg_ptr = (char *)wc[i].wr_id;
-                post_send_signaled(msg_size, lkey, 0, imm_data, qp[imm_data], msg_ptr);
-
-                /* post a new receive */
-                post_srq_recv(msg_size, lkey, wc[i].wr_id, srq, msg_ptr);
-            }
-        }
-    }
-
-    log_debug("signal to stop");
-    /* signal the client to stop */
-    for (i = 0; i < num_peers; i++)
-    {
-        ret = post_send_signaled(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[i], ib_res->ib_buf);
-        check(ret == 0, "thread: failed to signal the client to stop");
-    }
-
-    stop = false;
-    while (stop != true)
-    {
-        /* poll cq */
-        n = ibv_poll_cq(cq, NUM_WC, wc);
-        if (n < 0)
-        {
-            check(0, "thread: Failed to poll cq");
-        }
-
-        for (i = 0; i < n; i++)
-        {
-            if (wc[i].status != IBV_WC_SUCCESS)
-            {
-                if (wc[i].opcode == IBV_WC_SEND)
-                {
-                    check(0, "thread: send failed status: %s", ibv_wc_status_str(wc[i].status));
-                }
-                else
-                {
-                    check(0, "thread: recv failed status: %s", ibv_wc_status_str(wc[i].status));
                 }
             }
-
-            if (wc[i].opcode == IBV_WC_SEND)
-            {
-                if (wc[i].wr_id == IB_WR_ID_STOP)
-                {
-                    num_acked_peers += 1;
-                    if (num_acked_peers == num_peers)
-                    {
-                        stop = true;
-                        break;
-                    }
-                }
-            }
+            post_srq_recv(msg_size, lkey, wc[i].wr_id, srq, buf_ptr);
+            buf_offset = (buf_offset + msg_size) % buf_size;
+            buf_ptr = buf_base + buf_offset;
         }
     }
-
-    /* dump statistics */
-    duration = (double)((end.tv_sec - start.tv_sec) + (double)(end.tv_usec - start.tv_usec) / 1000000);
-    throughput = (double)(ops_count - NUM_WARMING_UP_OPS) / duration;
-
-    log("thread: throughput = %f (ops/s)", throughput);
-    printf("thread: throughput = %f (ops/s) %f (Bytes/s); ops_count:%ld, duration: %f seconds \n", throughput,
-           throughput * msg_size, ops_count, duration);
-
     free(wc);
     pthread_exit((void *)0);
 
