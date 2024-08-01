@@ -1,3 +1,4 @@
+#include <libconfig.h>
 #define _GNU_SOURCE
 #include <stdbool.h>
 #include <stdlib.h>
@@ -167,14 +168,13 @@ error:
     pthread_exit((void *)-1);
 }
 
-void *server_thread_write_imm(void *arg)
+void *server_thread_write_imm_signaled(void *arg)
 {
     struct args *args = (struct args *)arg;
     struct IBRes *ib_res = args->ib_res;
     assert(ib_res->num_qps == 1);
     int ret = 0;
     int msg_size = config_info.msg_size;
-    int num_concurr_msgs = config_info.num_concurr_msgs;
 
     struct ibv_qp **qp = ib_res->qp;
     struct ibv_cq *cq = ib_res->cq;
@@ -198,7 +198,7 @@ void *server_thread_write_imm(void *arg)
     wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
     check(wc != NULL, "thread: failed to allocate wc.");
 
-    for (int j = 0; j < num_concurr_msgs; j++)
+    for (int j = 0; j < config_info.num_concurr_msgs; j++)
     {
         ret = post_srq_recv(msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
         if (unlikely(ret != 0))
@@ -240,11 +240,11 @@ void *server_thread_write_imm(void *arg)
             {
                 /* uint32_t imm_data = ntohl(wc[i].imm_data); */
                 ops_count++;
-                if (ops_count == NUM_WARMING_UP_OPS)
+                if (ops_count == config_info.warm_up_iter)
                 {
                     gettimeofday(&start, NULL);
                 }
-                if (ops_count == TOT_NUM_OPS)
+                if (ops_count == config_info.total_iter)
                 {
                     gettimeofday(&end, NULL);
                     stop = true;
@@ -298,6 +298,84 @@ void *server_thread_write_imm(void *arg)
            throughput * msg_size, ops_count, duration);
     printf("latency: %f\n", latency);
 
+    free(wc);
+    pthread_exit((void *)0);
+error:
+    free(wc);
+    pthread_exit((void *)-1);
+}
+
+void *server_thread_write_imm_unsignaled(void *arg)
+{
+    struct args *args = (struct args *)arg;
+    struct IBRes *ib_res = args->ib_res;
+    assert(ib_res->num_qps == 1);
+    int ret = 0;
+    int msg_size = config_info.msg_size;
+    int num_concurr_msgs = config_info.num_concurr_msgs;
+
+    struct ibv_cq *cq = ib_res->cq;
+    struct ibv_srq *srq = ib_res->srq;
+    struct ibv_wc *wc = NULL;
+    uint32_t lkey = ib_res->mr->lkey;
+
+    struct ibv_qp **qp = ib_res->qp;
+    char *buf_ptr = ib_res->ib_buf;
+    char *buf_base = ib_res->ib_buf;
+    int buf_offset = 0;
+    size_t buf_size = ib_res->ib_buf_size;
+
+    int num_completion = 0;
+
+    wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
+    check(wc != NULL, "thread: failed to allocate wc.");
+
+    for (int j = 0; j < num_concurr_msgs; j++)
+    {
+        ret = post_srq_recv(msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
+        if (unlikely(ret != 0))
+        {
+            log_error("post shared receive request fail");
+            goto error;
+        }
+        buf_offset = (buf_offset + msg_size) % buf_size;
+        buf_ptr = buf_base + buf_offset;
+    }
+
+    ret = post_send_signaled(0, lkey, 0, MSG_CTL_START, qp[0], buf_base);
+    if (unlikely(ret != 0))
+    {
+        log_error("thread: failed to signal the client to start");
+    }
+    log_debug("start signal sent");
+
+    bool finish = false;
+    while (!finish)
+    {
+        num_completion = ibv_poll_cq(cq, NUM_WC, wc);
+        if (unlikely(num_completion < 0))
+        {
+            log_error("failed to poll cq");
+            goto error;
+        }
+        for (int i = 0; i < num_completion; i++)
+        {
+            if (wc[i].status != IBV_WC_SUCCESS)
+            {
+                log_error("wc failed status: %s.", ibv_wc_status_str(wc[i].status));
+                goto error;
+            }
+            if (wc[i].opcode == IBV_WC_RECV)
+            {
+                /* post a receive */
+                if ((wc[i].wc_flags & IBV_WC_WITH_IMM) && (ntohl(wc[i].imm_data) == MSG_CTL_STOP))
+                {
+                    finish = true;
+                }
+            }
+            post_srq_recv(msg_size, lkey, wc[i].wr_id, srq, buf_base);
+        }
+    }
     free(wc);
     pthread_exit((void *)0);
 error:
@@ -503,9 +581,13 @@ int run_server(struct IBRes *ib_res)
     {
         server_thread_func = server_thread_write_unsignaled;
     }
-    else if (benchmark_type == WRITE_IMM)
+    else if (benchmark_type == WRITE_IMM_SIGNALED)
     {
-        server_thread_func = server_thread_write_imm;
+        server_thread_func = server_thread_write_imm_signaled;
+    }
+    else if (benchmark_type == WRITE_IMM_UNSIGNALED)
+    {
+        server_thread_func = server_thread_write_imm_unsignaled;
     }
     else
     {

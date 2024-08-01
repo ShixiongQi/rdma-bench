@@ -1,3 +1,4 @@
+#include <stdint.h>
 #define _GNU_SOURCE
 #include <libconfig.h>
 #include <stdbool.h>
@@ -317,14 +318,13 @@ error:
     pthread_exit((void *)-1);
 }
 
-void *client_thread_write_imm(void *arg)
+void *client_thread_write_imm_signaled(void *arg)
 {
     struct args *args = (struct args *)arg;
     struct IBRes *ib_res = args->ib_res;
     assert(ib_res->num_qps == 1);
     int ret = 0;
     int msg_size = config_info.msg_size;
-    int num_concurr_msgs = config_info.num_concurr_msgs;
 
     struct ibv_qp **qp = ib_res->qp;
     struct ibv_cq *cq = ib_res->cq;
@@ -348,7 +348,7 @@ void *client_thread_write_imm(void *arg)
     wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
     check(wc != NULL, "thread: failed to allocate wc.");
 
-    for (int j = 0; j < num_concurr_msgs; j++)
+    for (int j = 0; j < config_info.num_concurr_msgs; j++)
     {
         ret = post_srq_recv(msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
         if (unlikely(ret != 0))
@@ -402,7 +402,7 @@ void *client_thread_write_imm(void *arg)
     roffset = 0;
     while (!stop)
     {
-        ret = post_write_imm_data(msg_size, lkey, 0, *qp, buf_ptr, rptr, rkey, 0);
+        ret = post_write_imm_signaled(msg_size, lkey, 0, *qp, buf_ptr, rptr, rkey, 0);
         if (unlikely(ret != 0))
         {
             log_error("send write imme_data failed, error ret: %d", ret);
@@ -449,6 +449,177 @@ error:
     return NULL;
 }
 
+void *client_thread_write_imm_unsignaled(void *arg)
+{
+    struct args *args = (struct args *)arg;
+    struct IBRes *ib_res = args->ib_res;
+    assert(ib_res->num_qps == 1);
+    int ret = 0;
+    int msg_size = config_info.msg_size;
+    /* int num_concurr_msgs = config_info.num_concurr_msgs; */
+
+    struct ibv_qp **qp = ib_res->qp;
+    struct ibv_cq *cq = ib_res->cq;
+    struct ibv_srq *srq = ib_res->srq;
+    struct ibv_wc *wc = NULL;
+    uint32_t lkey = ib_res->mr->lkey;
+
+    char *buf_ptr = ib_res->ib_buf;
+    char *buf_base = ib_res->ib_buf;
+    int buf_offset = 0;
+    size_t buf_size = ib_res->ib_buf_size;
+    assert(buf_size % msg_size == 0);
+    int num_completion = 0;
+
+    int rbuf_offset = 0;
+    uint32_t rbuf_size = ib_res->rsize;
+    uint64_t rbuf_ptr = ib_res->raddr;
+    uint64_t rbuf_base = ib_res->raddr;
+    uint32_t rkey = ib_res->rkey;
+    assert(rbuf_size % msg_size == 0);
+    struct timeval start, end;
+    double duration = 0.0;
+    double latency = 0.0;
+    double throughput = 0.0;
+
+    wc = (struct ibv_wc *)calloc(NUM_WC, sizeof(struct ibv_wc));
+    check(wc != NULL, "thread: failed to allocate wc.");
+
+    for (int j = 0; j < config_info.num_concurr_msgs; j++)
+    {
+        ret = post_srq_recv(msg_size, lkey, (uint64_t)buf_ptr, srq, buf_ptr);
+        if (unlikely(ret != 0))
+        {
+            log_error("post shared receive request fail");
+            goto error;
+        }
+        buf_offset = (buf_offset + msg_size) % buf_size;
+        buf_ptr = buf_base + buf_offset;
+    }
+
+    log_debug("thread: ready to send");
+
+    bool start_sending = false;
+
+    while (start_sending != true)
+    {
+        num_completion = ibv_poll_cq(cq, NUM_WC, wc);
+        if (unlikely(num_completion < 0))
+        {
+            log_error("failed to poll cq");
+            goto error;
+        }
+        for (int i = 0; i < num_completion; i++)
+        {
+            if (unlikely(wc[i].status != IBV_WC_SUCCESS))
+            {
+                log_error("wc failed status: %s.", ibv_wc_status_str(wc[i].status));
+                goto error;
+            }
+            if (wc[i].opcode == IBV_WC_RECV)
+            {
+                /* post a receive */
+                post_srq_recv(msg_size, lkey, wc[i].wr_id, srq, (char *)wc[i].wr_id);
+
+                if (ntohl(wc[i].imm_data) == MSG_CTL_START)
+                {
+                    log_debug("received start signal");
+                    start_sending = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    buf_offset = 0;
+    debug("buf_ptr = %" PRIx64 "", (uint64_t)buf_ptr);
+    long int warm_up_iter = config_info.warm_up_iter;
+    long int total_iter = config_info.total_iter;
+    int signal_freq = config_info.signal_freq;
+    long int opt_count = 0;
+    num_completion = 0;
+    while (true)
+    {
+        for (int i = 0; i < signal_freq; i++)
+        {
+            ret = post_write_imm_unsignaled(msg_size, lkey, 1, *qp, buf_ptr, rbuf_ptr, rkey, 1);
+            buf_offset = (buf_offset + msg_size) % buf_size;
+            buf_ptr = buf_base + buf_offset;
+            rbuf_offset = (rbuf_offset + msg_size) % rbuf_size;
+            rbuf_ptr = rbuf_base + rbuf_offset;
+        }
+
+        ret = post_write_imm_signaled(msg_size, lkey, 1, *qp, buf_ptr, rbuf_ptr, rkey, 1);
+        buf_offset = (buf_offset + msg_size) % buf_size;
+        buf_ptr = buf_base + buf_offset;
+        rbuf_offset = (rbuf_offset + msg_size) % rbuf_size;
+        rbuf_ptr = rbuf_base + rbuf_offset;
+        do
+        {
+            num_completion = ibv_poll_cq(cq, NUM_WC, wc);
+        } while (num_completion == 0);
+        if (unlikely(num_completion < 0))
+        {
+            log_error("failed to poll cq");
+            goto error;
+        }
+        for (int i = 0; i < num_completion; i++)
+        {
+            if (unlikely(wc[i].status != IBV_WC_SUCCESS))
+            {
+                log_error("wc failed status: %s.", ibv_wc_status_str(wc[i].status));
+                goto error;
+            }
+        }
+        opt_count++;
+        if (opt_count == warm_up_iter)
+        {
+            gettimeofday(&start, NULL);
+        }
+        if (opt_count == total_iter)
+        {
+            gettimeofday(&end, NULL);
+            break;
+        }
+    }
+
+    duration = (double)((end.tv_sec - start.tv_sec) + (double)(end.tv_usec - start.tv_usec) / 1000000);
+    latency = duration * 1000000 / (double)(total_iter - warm_up_iter);
+
+    throughput = (double)(total_iter - warm_up_iter) * (signal_freq + 1) * msg_size / duration;
+    printf("latency: %f for %d unsignaled operations plus a signaled operation\n", latency, signal_freq);
+    printf("throughput: %f (Bytes/s)\n", throughput);
+
+    ret = post_send_signaled(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[0], buf_ptr);
+    bool finish = false;
+    while (!finish)
+    {
+        num_completion = ibv_poll_cq(cq, NUM_WC, wc);
+        if (unlikely(num_completion < 0))
+        {
+            log_error("failed to poll cq");
+            goto error;
+        }
+        for (int i = 0; i < num_completion; i++)
+        {
+            if (wc[i].status != IBV_WC_SUCCESS)
+            {
+                log_error("wc failed status: %s.", ibv_wc_status_str(wc[i].status));
+                goto error;
+            }
+            if (wc[i].opcode == IBV_WC_SEND)
+            {
+                finish = true;
+            }
+        }
+    }
+    free(wc);
+    pthread_exit((void *)0);
+
+error:
+    free(wc);
+    pthread_exit((void *)-1);
+}
 void *client_thread_send_signaled(void *arg)
 {
     struct args *args = (struct args *)arg;
@@ -558,7 +729,7 @@ void *client_thread_send_signaled(void *arg)
                 }
             }
 
-            if (wc[i].opcode == IBV_WC_RECV)
+            if (wc[i].opcode == IBV_WC_SEND)
             {
                 ops_count += 1;
 
@@ -570,6 +741,10 @@ void *client_thread_send_signaled(void *arg)
                 if (ops_count == config_info.total_iter)
                 {
                     gettimeofday(&end, NULL);
+                    ret = post_send_signaled(0, lkey, IB_WR_ID_STOP, MSG_CTL_STOP, qp[0], buf_ptr);
+                }
+                if (wc[i].wr_id == IB_WR_ID_STOP)
+                {
                     stop = true;
                     break;
                 }
@@ -583,11 +758,11 @@ void *client_thread_send_signaled(void *arg)
     /* dump statistics */
     duration = (double)((end.tv_sec - start.tv_sec) + (double)(end.tv_usec - start.tv_usec) / 1000000);
     throughput = (double)(config_info.total_iter - config_info.warm_up_iter) / duration;
-    latency = duration / (double)(config_info.total_iter - config_info.warm_up_iter);
+    latency = duration * 1000000 / (double)(config_info.total_iter - config_info.warm_up_iter);
 
     log("thread: throughput = %f (ops/s)", throughput);
     printf("thread: throughput = %f (ops/s) %f (Bytes/s)\n", throughput, throughput * msg_size);
-    printf("latency: %f", latency);
+    printf("latency: %f usec", latency);
 
     free(wc);
     pthread_exit((void *)0);
@@ -797,9 +972,13 @@ int run_client(struct IBRes *ib_res)
     {
         client_thread_func = client_thread_write_unsignaled;
     }
-    else if (benchmark_type == WRITE_IMM)
+    else if (benchmark_type == WRITE_IMM_SIGNALED)
     {
-        client_thread_func = client_thread_write_imm;
+        client_thread_func = client_thread_write_imm_signaled;
+    }
+    else if (benchmark_type == WRITE_IMM_UNSIGNALED)
+    {
+        client_thread_func = client_thread_write_imm_unsignaled;
     }
     else
     {
