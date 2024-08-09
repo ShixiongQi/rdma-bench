@@ -1,6 +1,6 @@
 #include "client.h"
-#include "config.h"
 #include "debug.h"
+#include "rdma-bench_cfg.h"
 #include "server.h"
 #include "setup_ib.h"
 #include <getopt.h>
@@ -17,7 +17,7 @@
 #endif /* ifdef USE_RTE_MEMPOOL */
 extern FILE *log_fp;
 
-int init_env();
+int init_env(struct ConfigInfo *config_info);
 void destroy_env();
 
 int main(int argc, char *argv[])
@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
     }
     print_benchmark_cfg(&config_info);
 
-    ret = init_env();
+    ret = init_env(&config_info);
     check(ret == 0, "Failed to init env");
 
     struct IBRes ib_res;
@@ -137,11 +137,11 @@ error:
     return ret;
 }
 
-int init_env()
+int init_env(struct ConfigInfo *config_info)
 {
     char fname[64] = {'\0'};
 
-    if (config_info.is_server)
+    if (config_info->is_server)
     {
         sprintf(fname, "server.log");
     }

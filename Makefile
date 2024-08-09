@@ -14,7 +14,7 @@ endif
 
 
 CC=gcc
-CFLAGS += -Wall -Werror -Wno-stringop-truncation -O3
+CFLAGS += -Wall -Werror -Wno-stringop-truncation -O3 -g
 INCLUDES = -I./ -I./test/unity -I./perf
 LDFLAGS += -libverbs
 LIBS=-pthread
@@ -57,7 +57,7 @@ debug: clean
 
 $(BIN_DIR)/rdma-bench: $(SRC_OBJS) $(PERF_OBJS)
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(PERF_DIR)/rdma-bench.o $(PERF_DIR)/client.o $(PERF_DIR)/server.o $(SRC_OBJS) $(LDFLAGS) $(LIBS) $(LDLIBS)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(PERF_DIR)/rdma-bench.o $(PERF_DIR)/rdma-bench_cfg.o $(PERF_DIR)/client.o $(PERF_DIR)/server.o $(PERF_DIR)/setup_ib.o $(SRC_OBJS) $(LDFLAGS) $(LIBS) $(LDLIBS)
 
 $(TEST_EXEC): $(filter-out main.o, $(SRC_OBJS)) $(TEST_OBJS) $(UNITY_OBJS)
 	@mkdir -p $(BIN_DIR)
@@ -66,7 +66,7 @@ $(TEST_EXEC): $(filter-out main.o, $(SRC_OBJS)) $(TEST_OBJS) $(UNITY_OBJS)
 
 .PHONY: clean format
 clean:
-	$(RM) *.o $(TEST_DIR)/*.o $(UNITY_DIR)/*.o $(PERF_DIR)/*.o *~ $(BIN_DIR)/* compile_commands.json
+	$(RM) *.o $(TEST_DIR)/*.o $(UNITY_DIR)/*.o $(PERF_DIR)/*.o *~ $(BIN_DIR)/* compile_commands.json *.log
 
 format:
 	@if command -v clang-format >/dev/null 2>&1; then \

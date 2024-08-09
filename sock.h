@@ -3,7 +3,7 @@
 
 #include <inttypes.h>
 
-#include "ib.h"
+#include "qp.h"
 
 #define SOCK_SYNC_MSG "sync"
 

@@ -1,6 +1,7 @@
 #ifndef SETUP_IB_H_
 #define SETUP_IB_H_
 
+#include "rdma-bench_cfg.h"
 #include <assert.h>
 #include <infiniband/verbs.h>
 

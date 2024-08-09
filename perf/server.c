@@ -5,12 +5,14 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "config.h"
 #include "debug.h"
 #include "ib.h"
+#include "qp.h"
+#include "rdma-bench_cfg.h"
 #include "server.h"
 #include "setup_ib.h"
 #include "sock.h"
+#include "utils.h"
 
 struct args
 {

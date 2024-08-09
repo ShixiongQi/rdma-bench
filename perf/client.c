@@ -1,4 +1,3 @@
-#include <stdint.h>
 #define _GNU_SOURCE
 #include <libconfig.h>
 #include <stdbool.h>
@@ -10,8 +9,10 @@
 #include "config.h"
 #include "debug.h"
 #include "ib.h"
+#include "qp.h"
 #include "setup_ib.h"
 #include "sock.h"
+#include "utils.h"
 
 struct args
 {
