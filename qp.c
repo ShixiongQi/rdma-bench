@@ -5,23 +5,22 @@
 #include <infiniband/verbs.h>
 #include <stdint.h>
 
-int init_rc_qp(struct ib_ctx *ctx, struct ibv_qp **qp)
+int init_rc_qp_srq_unsignaled(struct ib_ctx *ctx, struct ibv_qp **qp, int max_send_wr)
 {
+    assert(max_send_wr > 0);
     struct ibv_qp_init_attr qp_init_attr = {
         .send_cq = ctx->send_cq,
         .recv_cq = ctx->recv_cq,
         .srq = ctx->srq,
         .cap =
             {
-                // TODO add retry to determine the max_send_wr
-                .max_send_wr = 64,
+                .max_send_wr = MIN(max_send_wr, ctx->device_attr.max_qp_wr - 1),
                 .max_recv_wr = 64,
-                /* .max_recv_wr = ib_res->dev_attr.max_qp_wr, */
                 .max_send_sge = 1,
                 .max_recv_sge = 1,
-                /* .max_recv_sge = 1, */
             },
         .qp_type = IBV_QPT_RC,
+        .sq_sig_all = 0,
     };
 
     *qp = ibv_create_qp(ctx->pd, &qp_init_attr);

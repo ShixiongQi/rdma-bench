@@ -1,6 +1,7 @@
 #ifndef IB_H_
 #define IB_H_
 
+#include "config.h"
 #include <arpa/inet.h>
 #include <byteswap.h>
 #include <endian.h>
@@ -38,19 +39,27 @@ static inline uint64_t ntohll(uint64_t x)
 struct ib_ctx
 {
     struct ibv_device *device;
+    int device_idx;
     struct ibv_context *context;
     struct ibv_pd *pd;
+    uint32_t qp_num;
     struct ibv_qp **qps;
+    uint32_t mr_num;
     struct ibv_mr **mrs;
     struct ibv_srq *srq;
     struct ibv_cq *send_cq;
     struct ibv_cq *recv_cq;
     struct ibv_comp_channel *send_channel;
+    struct ibv_device_attr device_attr;
+    struct ibv_port_attr port_attr;
+    int sgid_idx;
+    union ibv_gid gid;
+    uint16_t lid;
     int send_cqe;
     int recv_cqe;
 };
 
-int init_ib_ctx(struct ib_ctx *ctx, int dev_idx);
+int init_ib_ctx(struct ib_ctx *ctx, struct user_param *params);
 int destroy_ib_ctx(struct ib_ctx *ctx);
 int post_send_signaled(uint32_t req_size, uint32_t lkey, uint64_t wr_id, uint32_t imm_data, struct ibv_qp *qp,
                        char *buf);

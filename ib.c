@@ -6,11 +6,12 @@
 
 #include <unistd.h>
 
+#include "config.h"
 #include "debug.h"
 #include "ib.h"
 #include "utils.h"
 
-int init_ib_ctx(struct ib_ctx *ctx, int dev_idx)
+int init_ib_ctx(struct ib_ctx *ctx, struct user_param *params)
 {
     int num_of_device;
     struct ibv_device **dev_list;
@@ -23,11 +24,11 @@ int init_ib_ctx(struct ib_ctx *ctx, int dev_idx)
         log_error(" If device exists, check if driver is up\n");
         goto error;
     }
-    assert(dev_idx < num_of_device);
-    ctx->device = dev_list[dev_idx];
+    assert(params->device_idx);
+    ctx->device = dev_list[params->device_idx];
     if (unlikely(!(ctx->device)))
     {
-        log_error("Can not open device %d", dev_idx);
+        log_error("Can not open device %d", params->device_idx);
         goto error;
     }
 
@@ -39,6 +40,8 @@ int init_ib_ctx(struct ib_ctx *ctx, int dev_idx)
         goto error;
     }
 
+    ctx->device_idx = params->device_idx;
+
     ctx->pd = ibv_alloc_pd(ctx->context);
 
     if (unlikely(!(ctx->pd)))
@@ -47,13 +50,35 @@ int init_ib_ctx(struct ib_ctx *ctx, int dev_idx)
         goto error;
     }
 
+    if (unlikely(ibv_query_device(ctx->context, &(ctx->device_attr))))
+    {
+        log_error("Error, ibv_query_device");
+        goto error;
+    }
+
+    if (unlikely(ibv_query_port(ctx->context, params->ib_port, &ctx->port_attr)))
+    {
+        log_error("Error, ibv_query_port");
+        goto error;
+    }
+
+    ctx->lid = ctx->port_attr.lid;
+
+    if (unlikely(ibv_query_gid(ctx->context, params->ib_port, params->sgid_idx, &ctx->gid)))
+    {
+        log_error("Error, ibv_query_gid");
+        goto error;
+    }
+
+    ctx->sgid_idx = params->sgid_idx;
+
     ctx->send_channel = ibv_create_comp_channel(ctx->context);
     if (unlikely(!(ctx->send_channel)))
     {
         log_error("Error, ibv_create_comp_channel() failed\n");
         goto error;
     }
-    ctx->send_cq = ibv_create_cq(ctx->context, 1000, NULL, ctx->send_channel, 0);
+    ctx->send_cq = ibv_create_cq(ctx->context, ctx->device_attr.max_cqe - 1, NULL, ctx->send_channel, 0);
     if (unlikely(!(ctx->send_cq)))
     {
         log_error("Error, ibv_create_qp() send completion queue failed\n");
@@ -62,7 +87,7 @@ int init_ib_ctx(struct ib_ctx *ctx, int dev_idx)
 
     ctx->send_cqe = ctx->send_cq->cqe;
 
-    ctx->recv_cq = ibv_create_cq(ctx->context, 1000, NULL, NULL, 0);
+    ctx->recv_cq = ibv_create_cq(ctx->context, ctx->device_attr.max_cqe - 1, NULL, NULL, 0);
     if (unlikely(!(ctx->recv_cq)))
     {
         log_error("Error, ibv_create_qp() receive completion queue failed\n");
@@ -72,7 +97,7 @@ int init_ib_ctx(struct ib_ctx *ctx, int dev_idx)
     ctx->recv_cqe = ctx->recv_cq->cqe;
 
     struct ibv_srq_init_attr attr = {.attr = {/* when using sreq, rx_depth sets the max_wr */
-                                              .max_wr = 1000,
+                                              .max_wr = ctx->device_attr.max_srq_wr - 1,
                                               .max_sge = 1}};
 
     ctx->srq = ibv_create_srq(ctx->pd, &attr);
@@ -86,19 +111,22 @@ int init_ib_ctx(struct ib_ctx *ctx, int dev_idx)
     return 0;
 error:
     ibv_free_device_list(dev_list);
+    destroy_ib_ctx(ctx);
     exit(1);
 }
 
 int destroy_ib_ctx(struct ib_ctx *ctx)
 {
-    if (ctx->pd != NULL)
+    if (ctx->qps != NULL)
     {
-        ibv_dealloc_pd(ctx->pd);
-    }
-
-    if (ctx->context != NULL)
-    {
-        ibv_close_device(ctx->context);
+        for (size_t i = 0; i < ctx->qp_num; i++)
+        {
+            if (ctx->qps[i] != NULL)
+            {
+                ibv_destroy_qp(ctx->qps[i]);
+            }
+        }
+        free(ctx->qps);
     }
     if (ctx->send_channel)
     {
@@ -115,6 +143,15 @@ int destroy_ib_ctx(struct ib_ctx *ctx)
     if (ctx->srq)
     {
         ibv_destroy_srq(ctx->srq);
+    }
+    if (ctx->pd != NULL)
+    {
+        ibv_dealloc_pd(ctx->pd);
+    }
+
+    if (ctx->context != NULL)
+    {
+        ibv_close_device(ctx->context);
     }
     return 0;
 }

@@ -1,11 +1,19 @@
 #include <stdio.h>
+#include "config.h"
 #include "ib.h"
 
 int main() {
-    printf("Hello, World!\n");
     struct ib_ctx ctx;
-    init_ib_ctx(&ctx, 3);
+    struct user_param params = {
+        .device_idx = 3,
+        .sgid_idx = 3,
+        .ib_port = 1,
+        .mr_num = 2,
+        .qp_num = 2,
+    };
+    init_ib_ctx(&ctx, &params);
     destroy_ib_ctx(&ctx);
+    printf("Hello, World!\n");
 
     return 0;
 }
