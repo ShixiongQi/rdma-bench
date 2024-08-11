@@ -35,12 +35,23 @@ static inline uint64_t ntohll(uint64_t x)
 #error __BYTE_ORDER is neither __LITTLE_ENDIAN nor __BIG_ENDIAN
 #endif
 
-enum MsgType
+struct ib_ctx
 {
-    MSG_CTL_START = 100,
-    MSG_CTL_STOP,
+    struct ibv_device *device;
+    struct ibv_context *context;
+    struct ibv_pd *pd;
+    struct ibv_qp **qps;
+    struct ibv_mr **mrs;
+    struct ibv_srq *srq;
+    struct ibv_cq *send_cq;
+    struct ibv_cq *recv_cq;
+    struct ibv_comp_channel *send_channel;
+    int send_cqe;
+    int recv_cqe;
 };
 
+int init_ib_ctx(struct ib_ctx *ctx, int dev_idx);
+int destroy_ib_ctx(struct ib_ctx *ctx);
 int post_send_signaled(uint32_t req_size, uint32_t lkey, uint64_t wr_id, uint32_t imm_data, struct ibv_qp *qp,
                        char *buf);
 

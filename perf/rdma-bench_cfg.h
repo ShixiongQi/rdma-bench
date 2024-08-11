@@ -2,6 +2,7 @@
 #define BENCHMARK_CFG_
 
 #include "debug.h"
+#include "sock.h"
 #include "utils.h"
 #include <assert.h>
 #include <inttypes.h>
@@ -16,6 +17,11 @@ extern struct ConfigInfo config_info;
 #define NUM_WARMING_UP_OPS 50000
 #define TOT_NUM_OPS 2000000
 
+enum MsgType
+{
+    MSG_CTL_START = 100,
+    MSG_CTL_STOP,
+};
 enum BenchMarkType
 {
     SEND_SIGNALED = 1,

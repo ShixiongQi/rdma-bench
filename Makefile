@@ -25,18 +25,21 @@ TEST_DIR=test
 PERF_DIR=perf
 UNITY_DIR=test/unity
 BIN_DIR=bin
+EXAMPLE_DIR=examples
 
 SRC_FILES = $(wildcard *.c)
+EXAMPLE_FILES = $(wildcard $(EXAMPLE_DIR)/*.c)
 TEST_FILES = $(wildcard $(TEST_DIR)/*.c)
 PERF_FILES = $(wildcard $(PERF_DIR)/*.c)
 UNITY_FILES = $(UNITY_DIR)/unity.c
 
 SRC_OBJS=$(SRC_FILES:.c=.o)
+EXAMPLE_OBJS=$(EXAMPLE_FILES:.c=.o)
 TEST_OBJS=$(TEST_FILES:.c=.o)
 PERF_OBJS=$(PERF_FILES:.c=.o)
 UNITY_OBJS=$(UNITY_FILES:.c=.o)
 
-PROG=$(BIN_DIR)/rdma-bench
+PROG=$(BIN_DIR)/rdma-bench $(BIN_DIR)/rc_connection
 TEST_EXEC=$(patsubst $(TEST_DIR)/%.c,$(BIN_DIR)/%,$(TEST_FILES))
 
 
@@ -58,6 +61,10 @@ debug: clean
 $(BIN_DIR)/rdma-bench: $(SRC_OBJS) $(PERF_OBJS)
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(PERF_DIR)/rdma-bench.o $(PERF_DIR)/rdma-bench_cfg.o $(PERF_DIR)/client.o $(PERF_DIR)/server.o $(PERF_DIR)/setup_ib.o $(SRC_OBJS) $(LDFLAGS) $(LIBS) $(LDLIBS)
+
+$(BIN_DIR)/rc_connection: $(SRC_OBJS) $(EXAMPLE_OBJS)
+	@mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(EXAMPLE_DIR)/rc_connection.o $(SRC_OBJS) $(LDFLAGS) $(LIBS) $(LDLIBS)
 
 $(TEST_EXEC): $(filter-out main.o, $(SRC_OBJS)) $(TEST_OBJS) $(UNITY_OBJS)
 	@mkdir -p $(BIN_DIR)

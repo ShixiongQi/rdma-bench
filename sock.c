@@ -169,29 +169,3 @@ error:
     }
     return -1;
 }
-
-int sock_set_qp_info(int sock_fd, struct QPInfo *qp_info)
-{
-    int n;
-
-    n = sock_write(sock_fd, (char *)qp_info, sizeof(struct QPInfo));
-    check(n == sizeof(struct QPInfo), "write qp_info to socket.");
-
-    return 0;
-
-error:
-    return -1;
-}
-
-int sock_get_qp_info(int sock_fd, struct QPInfo *qp_info)
-{
-    int n;
-
-    n = sock_read(sock_fd, (char *)qp_info, sizeof(struct QPInfo));
-    check(n == sizeof(struct QPInfo), "read qp_info from socket.");
-
-    return 0;
-
-error:
-    return -1;
-}
