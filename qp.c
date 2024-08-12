@@ -1,13 +1,13 @@
 #include "qp.h"
 #include "debug.h"
-#include "ib.h"
 #include "utils.h"
 #include <infiniband/verbs.h>
 #include <stdint.h>
+#include <stdlib.h>
 
-int init_rc_qp_srq_unsignaled(struct ib_ctx *ctx, struct ibv_qp **qp, int max_send_wr)
+int init_rc_qp_srq_unsignaled(struct ib_ctx *ctx, struct ibv_qp **qp, uint32_t max_send_wr)
 {
-    assert(max_send_wr > 0);
+    assert(max_send_wr != 0);
     struct ibv_qp_init_attr qp_init_attr = {
         .send_cq = ctx->send_cq,
         .recv_cq = ctx->recv_cq,
@@ -35,12 +35,23 @@ error:
     return FAILURE;
 }
 
-void destroy_qp(struct ibv_qp *qp)
+int init_multiple_rc_qp_srq_unsignaled(struct ib_ctx *ctx, struct user_param *params)
 {
-    if (qp)
+    assert(params->qp_num > 0);
+    ctx->qp_num = params->qp_num;
+    ctx->qps = (struct ibv_qp **)calloc(ctx->qp_num, sizeof(struct ib_qp *));
+    if (unlikely(!ctx->qps))
     {
-        ibv_destroy_qp(qp);
+        return FAILURE;
     }
+    for (int i = 0; i < ctx->qp_num; i++)
+    {
+        if (unlikely(init_rc_qp_srq_unsignaled(ctx, &(ctx->qps[i]), UINT32_MAX) == FAILURE))
+        {
+            return FAILURE;
+        }
+    }
+    return SUCCESS;
 }
 
 int modify_qp_init(struct ibv_qp *qp, uint8_t ib_port)
@@ -58,9 +69,9 @@ int modify_qp_init(struct ibv_qp *qp, uint8_t ib_port)
     if (unlikely(!ret))
     {
         log_error("Failed to modify qp to INIT.");
-        return -1;
+        return FAILURE;
     }
-    return 0;
+    return SUCCESS;
 }
 
 int modify_qp_init_to_rtr(struct ibv_qp *qp, uint32_t r_qp_num, uint32_t r_psn, uint16_t r_lid, uint8_t l_ib_port,

@@ -2,12 +2,15 @@
 #define IB_H_
 
 #include "config.h"
+#include "sock.h"
+#include "utils.h"
 #include <arpa/inet.h>
 #include <byteswap.h>
 #include <endian.h>
 #include <infiniband/verbs.h>
 #include <inttypes.h>
 #include <rdma/rdma_cma.h>
+#include <stdint.h>
 #include <sys/types.h>
 
 #define IB_WR_ID_STOP 0xE000000000000000
@@ -57,12 +60,32 @@ struct ib_ctx
     uint16_t lid;
     int send_cqe;
     int recv_cqe;
+    void **buffers;
+    uint64_t bf_size;
+    uint8_t ib_port;
 };
 
 int init_ib_ctx(struct ib_ctx *ctx, struct user_param *params);
-int destroy_ib_ctx(struct ib_ctx *ctx);
+void destroy_ib_ctx(struct ib_ctx *ctx);
 int post_send_signaled(uint32_t req_size, uint32_t lkey, uint64_t wr_id, uint32_t imm_data, struct ibv_qp *qp,
                        char *buf);
+
+struct ib_res
+{
+    union ibv_gid gid;
+    struct ibv_mr **mrs;
+    struct ibv_qp **qps;
+    uint32_t psn;
+    uint32_t mr_num;
+    uint32_t qp_num;
+    uint16_t lid;
+    uint8_t sgid_idx;
+    uint8_t ib_port;
+} __attribute__((packed));
+
+int send_ib_res(struct ib_ctx *ctx, int sock_fd);
+int recv_ib_res(struct ib_res *res, int sock_fd);
+void destroy_ib_res(struct ib_res *res);
 
 int post_send_unsignaled(uint32_t req_size, uint32_t lkey, uint64_t wr_id, uint32_t imm_data, struct ibv_qp *qp,
                          char *buf);

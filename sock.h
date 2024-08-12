@@ -2,8 +2,7 @@
 #define SOCK_H_
 
 #include <inttypes.h>
-
-#include "qp.h"
+#include <stdlib.h>
 
 #define SOCK_SYNC_MSG "sync"
 

@@ -10,6 +10,7 @@ else
 CFLAGS = $(shell pkg-config --cflags libconfig libdpdk)
 LDFLAGS = $(shell pkg-config --libs-only-L libconfig libdpdk)
 LDLIBS = $(shell pkg-config --libs-only-l libconfig libdpdk)
+CFLAGS += -DUSE_RTE_MEMPOOL
 endif
 
 

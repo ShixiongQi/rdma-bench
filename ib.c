@@ -9,6 +9,9 @@
 #include "config.h"
 #include "debug.h"
 #include "ib.h"
+#include "mr.h"
+#include "qp.h"
+#include "sock.h"
 #include "utils.h"
 
 int init_ib_ctx(struct ib_ctx *ctx, struct user_param *params)
@@ -63,6 +66,7 @@ int init_ib_ctx(struct ib_ctx *ctx, struct user_param *params)
     }
 
     ctx->lid = ctx->port_attr.lid;
+    ctx->ib_port = params->ib_port;
 
     if (unlikely(ibv_query_gid(ctx->context, params->ib_port, params->sgid_idx, &ctx->gid)))
     {
@@ -107,6 +111,17 @@ int init_ib_ctx(struct ib_ctx *ctx, struct user_param *params)
         goto error;
     }
 
+    if (unlikely(init_multiple_rc_qp_srq_unsignaled(ctx, params) == FAILURE))
+    {
+        log_error("Error, init multiple qps\n");
+        goto error;
+    }
+    if (unlikely(register_multiple_mr(ctx, params)))
+    {
+        log_error("Error, register mrs\n");
+        goto error;
+    }
+
     ibv_free_device_list(dev_list);
     return 0;
 error:
@@ -115,9 +130,21 @@ error:
     exit(1);
 }
 
-int destroy_ib_ctx(struct ib_ctx *ctx)
+void destroy_ib_ctx(struct ib_ctx *ctx)
 {
-    if (ctx->qps != NULL)
+    if (ctx->mrs)
+    {
+        for (size_t i = 0; i < ctx->mr_num; i++)
+        {
+            if (ctx->mrs[i])
+            {
+                ibv_dereg_mr(ctx->mrs[i]);
+            }
+        }
+        free(ctx->mrs);
+    }
+
+    if (ctx->qps)
     {
         for (size_t i = 0; i < ctx->qp_num; i++)
         {
@@ -153,7 +180,84 @@ int destroy_ib_ctx(struct ib_ctx *ctx)
     {
         ibv_close_device(ctx->context);
     }
-    return 0;
+}
+
+int send_ib_res(struct ib_ctx *ctx, int sock_fd)
+{
+    struct ib_res res = {
+        .gid = ctx->gid,
+        .mrs = ctx->mrs,
+        .qps = ctx->qps,
+        .psn = 0,
+        .mr_num = ctx->mr_num,
+        .qp_num = ctx->qp_num,
+        .lid = ctx->lid,
+        .sgid_idx = ctx->sgid_idx,
+        .ib_port = ctx->ib_port,
+
+    };
+    if (sock_write(sock_fd, &res, sizeof(struct ib_res)) != sizeof(struct ib_res))
+    {
+        log_error("Error, Send ib res\n");
+        goto error;
+    }
+
+    if (sock_write(sock_fd, ctx->qps, ctx->qp_num * sizeof(struct ibv_qp *)) != ctx->qp_num * sizeof(struct ibv_qp *))
+    {
+        log_error("Error, Send qps\n");
+        goto error;
+    }
+
+    if (sock_write(sock_fd, ctx->mrs, ctx->mr_num * sizeof(struct ibv_mr *)) != ctx->mr_num * sizeof(struct ibv_mr *))
+    {
+        log_error("Error, Send mrs\n");
+        goto error;
+    }
+    return SUCCESS;
+
+error:
+    exit(1);
+}
+
+int recv_ib_res(struct ib_res *res, int sock_fd)
+{
+    if (sock_read(sock_fd, res, sizeof(struct ib_res *)) != sizeof(struct ib_res *))
+    {
+        log_error("Error, recv ib res\n");
+        goto error;
+    }
+    struct ibv_qp **qps = (struct ibv_qp **)calloc(res->qp_num, sizeof(struct ibv_qp *));
+    if (!qps)
+    {
+        log_error("Error, fail to allocate mem for qps");
+        goto error;
+    }
+    struct ibv_mr **mrs = (struct ibv_mr **)calloc(res->mr_num, sizeof(struct ibv_mr *));
+    if (!qps)
+    {
+        log_error("Error, fail to allocate mem for mrs");
+        goto error;
+    }
+    if (sock_read(sock_fd, qps, res->qp_num * sizeof(struct ibv_qp *)) != res->qp_num * sizeof(struct ibv_qp *))
+    {
+        log_error("Error, fail to allocate mem for mrs");
+        goto error;
+    }
+    if (sock_read(sock_fd, mrs, res->mr_num * sizeof(struct ibv_mr *)) != res->mr_num * sizeof(struct ibv_mr *))
+    {
+        log_error("Error, recv mrs\n");
+        goto error;
+    }
+
+    return SUCCESS;
+error:
+    exit(1);
+}
+void destroy_ib_res(struct ib_res *res){
+    if (res) {
+        free(res->qps);
+        free(res->mrs);
+    }
 }
 
 int post_send(uint32_t req_size, uint32_t lkey, uint64_t wr_id, uint32_t imm_data, struct ibv_qp *qp, char *buf,
