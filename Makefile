@@ -14,8 +14,8 @@ CFLAGS += -DUSE_RTE_MEMPOOL
 endif
 
 
-CC=gcc
-CFLAGS += -Wall -Werror -Wno-stringop-truncation -O3 -g
+CC=clang
+CFLAGS += -Wall -Werror -Wno-string-conversion -O0 -g -DDEBUG
 INCLUDES = -I./ -I./test/unity -I./perf
 LDFLAGS += -libverbs
 LIBS=-pthread
@@ -46,9 +46,9 @@ TEST_EXEC=$(patsubst $(TEST_DIR)/%.c,$(BIN_DIR)/%,$(TEST_FILES))
 
 all: $(PROG) $(TEST_EXEC)
 
-debug: CFLAGS +=-g -DDEBUG
+debug: CFLAGS := -g -DDEBUG
 debug: clean
-	@if command -v bear >/dev/null 2>&1; then \
+	@if command -v bear >/dev/null ; then \
 		echo "Bear is installed, generating compile_commands.json"; \
 		bear -- make all; \
 	else \
@@ -74,11 +74,7 @@ $(TEST_EXEC): $(filter-out main.o, $(SRC_OBJS)) $(TEST_OBJS) $(UNITY_OBJS)
 
 .PHONY: clean format
 clean:
-	$(RM) *.o $(TEST_DIR)/*.o $(UNITY_DIR)/*.o $(PERF_DIR)/*.o *~ $(BIN_DIR)/* compile_commands.json *.log
+	$(RM) *.o $(TEST_DIR)/*.o $(UNITY_DIR)/*.o $(PERF_DIR)/*.o $(EXAMPLE_DIR)/*.o *~ $(BIN_DIR)/* compile_commands.json *.log
 
 format:
-	@if command -v clang-format >/dev/null 2>&1; then \
-		clang-format -i $(TEST_FILES) $(TEST_DIR)/*.h $(PERF_FILES) $(PERF_DIR)/*.h $(SRC_FILES) *.h \
-	else \
-		echo "clang-format is not installed, skipping formatting"; \
-	fi
+	@ clang-format -i $(TEST_DIR)/*.c  $(PERF_FILES) $(PERF_DIR)/*.h $(SRC_FILES) *.h $(EXAMPLE_FILES)
