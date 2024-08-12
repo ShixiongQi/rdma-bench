@@ -26,7 +26,7 @@ int init_rc_qp_srq_unsignaled(struct ib_ctx *ctx, struct ibv_qp **qp, uint32_t m
     *qp = ibv_create_qp(ctx->pd, &qp_init_attr);
     if (unlikely(!(*qp)))
     {
-        log_error("Error init qp");
+        log_error("Error init qp, current max_send_wr: %d", MIN(max_send_wr, ctx->device_attr.max_qp_wr - 1));
         goto error;
     }
 
@@ -42,12 +42,14 @@ int init_multiple_rc_qp_srq_unsignaled(struct ib_ctx *ctx, struct user_param *pa
     ctx->qps = (struct ibv_qp **)calloc(ctx->qp_num, sizeof(struct ib_qp *));
     if (unlikely(!ctx->qps))
     {
+        log_error("Error, allocate qps failure\n");
         return FAILURE;
     }
-    for (int i = 0; i < ctx->qp_num; i++)
+    for (size_t i = 0; i < ctx->qp_num; i++)
     {
-        if (unlikely(init_rc_qp_srq_unsignaled(ctx, &(ctx->qps[i]), UINT32_MAX) == FAILURE))
+        if (unlikely(init_rc_qp_srq_unsignaled(ctx, &(ctx->qps[i]), UINT8_MAX) == FAILURE))
         {
+            log_error("Error, allocate the %lu th qp", i);
             return FAILURE;
         }
     }

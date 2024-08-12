@@ -14,7 +14,7 @@
 #include "sock.h"
 #include "utils.h"
 
-int init_ib_ctx(struct ib_ctx *ctx, struct user_param *params)
+int init_ib_ctx(struct ib_ctx *ctx, struct user_param *params, void **buffers)
 {
     int num_of_device;
     struct ibv_device **dev_list;
@@ -116,11 +116,13 @@ int init_ib_ctx(struct ib_ctx *ctx, struct user_param *params)
         log_error("Error, init multiple qps\n");
         goto error;
     }
-    if (unlikely(register_multiple_mr(ctx, params)))
+
+    if (unlikely(register_multiple_mr(ctx, params, buffers) == FAILURE))
     {
         log_error("Error, register mrs\n");
         goto error;
     }
+
 
     ibv_free_device_list(dev_list);
     return 0;
@@ -132,6 +134,7 @@ error:
 
 void destroy_ib_ctx(struct ib_ctx *ctx)
 {
+    // caller is responsible for release the raw memory
     if (ctx->mrs)
     {
         for (size_t i = 0; i < ctx->mr_num; i++)
@@ -141,7 +144,6 @@ void destroy_ib_ctx(struct ib_ctx *ctx)
                 ibv_dereg_mr(ctx->mrs[i]);
             }
         }
-        free(ctx->mrs);
     }
 
     if (ctx->qps)
@@ -253,8 +255,10 @@ int recv_ib_res(struct ib_res *res, int sock_fd)
 error:
     exit(1);
 }
-void destroy_ib_res(struct ib_res *res){
-    if (res) {
+void destroy_ib_res(struct ib_res *res)
+{
+    if (res)
+    {
         free(res->qps);
         free(res->mrs);
     }
