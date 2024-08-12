@@ -40,7 +40,7 @@ int register_multiple_mr(struct ib_ctx *ctx, struct user_param *params, void **b
         return FAILURE;
     }
 
-    ctx->mrs = (struct ibv_mr **)calloc(ctx->mr_num , sizeof(struct ibv_mr*));
+    ctx->mrs = (struct ibv_mr **)calloc(ctx->mr_num, sizeof(struct ibv_mr *));
 
     if (unlikely(!ctx->mrs))
     {

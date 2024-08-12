@@ -70,11 +70,19 @@ void destroy_ib_ctx(struct ib_ctx *ctx);
 int post_send_signaled(uint32_t req_size, uint32_t lkey, uint64_t wr_id, uint32_t imm_data, struct ibv_qp *qp,
                        char *buf);
 
+struct mr_info
+{
+    void *addr;
+    size_t length;
+    uint32_t lkey;
+    uint32_t rkey;
+} __attribute__((packed));
+
 struct ib_res
 {
     union ibv_gid gid;
-    struct ibv_mr **mrs;
-    struct ibv_qp **qps;
+    struct mr_info *mrs;
+    uint32_t *qp_nums;
     uint32_t psn;
     uint32_t mr_num;
     uint32_t qp_num;
@@ -83,8 +91,10 @@ struct ib_res
     uint8_t ib_port;
 } __attribute__((packed));
 
-int send_ib_res(struct ib_ctx *ctx, int sock_fd);
-int recv_ib_res(struct ib_res *res, int sock_fd);
+void init_local_ib_res(struct ib_ctx *ctx, struct ib_res *res);
+// the local ib_res should be initialized first
+int send_ib_res(struct ib_res *local_ib_res, int sock_fd);
+int recv_ib_res(struct ib_res *remote_ib_res, int sock_fd);
 void destroy_ib_res(struct ib_res *res);
 
 int post_send_unsignaled(uint32_t req_size, uint32_t lkey, uint64_t wr_id, uint32_t imm_data, struct ibv_qp *qp,

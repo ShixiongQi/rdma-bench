@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "config.h"
@@ -123,7 +124,6 @@ int init_ib_ctx(struct ib_ctx *ctx, struct user_param *params, void **buffers)
         goto error;
     }
 
-
     ibv_free_device_list(dev_list);
     return 0;
 error:
@@ -144,6 +144,7 @@ void destroy_ib_ctx(struct ib_ctx *ctx)
                 ibv_dereg_mr(ctx->mrs[i]);
             }
         }
+        free(ctx->mrs);
     }
 
     if (ctx->qps)
@@ -184,37 +185,80 @@ void destroy_ib_ctx(struct ib_ctx *ctx)
     }
 }
 
-int send_ib_res(struct ib_ctx *ctx, int sock_fd)
+void init_local_ib_res(struct ib_ctx *ctx, struct ib_res *res)
 {
-    struct ib_res res = {
-        .gid = ctx->gid,
-        .mrs = ctx->mrs,
-        .qps = ctx->qps,
-        .psn = 0,
-        .mr_num = ctx->mr_num,
-        .qp_num = ctx->qp_num,
-        .lid = ctx->lid,
-        .sgid_idx = ctx->sgid_idx,
-        .ib_port = ctx->ib_port,
 
-    };
+    res->gid = ctx->gid;
+    res->psn = 0;
+    res->mr_num = ctx->mr_num;
+    res->qp_num = ctx->qp_num;
+    res->lid = ctx->lid;
+    res->sgid_idx = ctx->sgid_idx;
+    res->ib_port = ctx->ib_port;
+
+    uint32_t *qp_nums = (uint32_t *)calloc(res->qp_num, sizeof(uint32_t));
+    if (!qp_nums)
+    {
+        log_error("Error, fail to allocate mem for qps");
+        goto error;
+    }
+
+    res->qp_nums = qp_nums;
+
+    struct mr_info *mrs = (struct mr_info *)calloc(res->mr_num, sizeof(struct mr_info));
+    if (!mrs)
+    {
+        log_error("Error, fail to allocate mem for mrs");
+        goto error;
+    }
+
+    res->mrs = mrs;
+
+    for (size_t i = 0; i < ctx->qp_num; i++)
+    {
+        res->qp_nums[i] = ctx->qps[i]->qp_num;
+    }
+
+    for (size_t i = 0; i < ctx->mr_num; i++)
+    {
+        res->mrs[i].length = ctx->mrs[i]->length;
+        res->mrs[i].lkey = ctx->mrs[i]->lkey;
+        res->mrs[i].rkey = ctx->mrs[i]->rkey;
+        res->mrs[i].addr = ctx->mrs[i]->addr;
+    }
+    return;
+error:
+    log_error("init local ib res failed\n");
+    exit(1);
+}
+
+int send_ib_res(struct ib_res *res, int sock_fd)
+{
     if (sock_write(sock_fd, &res, sizeof(struct ib_res)) != sizeof(struct ib_res))
     {
         log_error("Error, Send ib res\n");
         goto error;
     }
-
-    if (sock_write(sock_fd, ctx->qps, ctx->qp_num * sizeof(struct ibv_qp *)) != ctx->qp_num * sizeof(struct ibv_qp *))
+    for (size_t i = 0; i < res->qp_num; i++)
     {
-        log_error("Error, Send qps\n");
-        goto error;
+
+        if (sock_write(sock_fd, &(res->qp_nums[i]), sizeof(uint32_t)) != sizeof(uint32_t))
+        {
+            log_error("Error, Send qp_num at index %lu\n", i);
+            goto error;
+        }
     }
 
-    if (sock_write(sock_fd, ctx->mrs, ctx->mr_num * sizeof(struct ibv_mr *)) != ctx->mr_num * sizeof(struct ibv_mr *))
+    for (size_t i = 0; i < res->mr_num; i++)
     {
-        log_error("Error, Send mrs\n");
-        goto error;
+
+        if (sock_write(sock_fd, &(res->mrs[i]), sizeof(struct mr_info)) != sizeof(struct mr_info))
+        {
+            log_error("Error, Send ibv_mr at index %lu\n", i);
+            goto error;
+        }
     }
+
     return SUCCESS;
 
 error:
@@ -223,43 +267,57 @@ error:
 
 int recv_ib_res(struct ib_res *res, int sock_fd)
 {
-    if (sock_read(sock_fd, res, sizeof(struct ib_res *)) != sizeof(struct ib_res *))
+    if (sock_read(sock_fd, res, sizeof(struct ib_res)) != sizeof(struct ib_res))
     {
         log_error("Error, recv ib res\n");
         goto error;
     }
-    struct ibv_qp **qps = (struct ibv_qp **)calloc(res->qp_num, sizeof(struct ibv_qp *));
-    if (!qps)
+    uint32_t *qp_nums = (uint32_t *)calloc(res->qp_num, sizeof(uint32_t));
+    if (!qp_nums)
     {
         log_error("Error, fail to allocate mem for qps");
         goto error;
     }
-    struct ibv_mr **mrs = (struct ibv_mr **)calloc(res->mr_num, sizeof(struct ibv_mr *));
-    if (!qps)
+    struct mr_info *mrs = (struct mr_info *)calloc(res->mr_num, sizeof(struct mr_info));
+    if (!mrs)
     {
         log_error("Error, fail to allocate mem for mrs");
         goto error;
     }
-    if (sock_read(sock_fd, qps, res->qp_num * sizeof(struct ibv_qp *)) != res->qp_num * sizeof(struct ibv_qp *))
+    for (size_t i = 0; i < res->qp_num; i++)
     {
-        log_error("Error, fail to allocate mem for mrs");
-        goto error;
+
+        if (sock_read(sock_fd, &(qp_nums[i]), sizeof(uint32_t)) != sizeof(uint32_t))
+        {
+            log_error("Error, Recv qp_num at index %lu\n", i);
+            goto error;
+        }
     }
-    if (sock_read(sock_fd, mrs, res->mr_num * sizeof(struct ibv_mr *)) != res->mr_num * sizeof(struct ibv_mr *))
+
+    res->qp_nums = qp_nums;
+
+    for (size_t i = 0; i < res->mr_num; i++)
     {
-        log_error("Error, recv mrs\n");
-        goto error;
+
+        if (sock_read(sock_fd, &(mrs[i]), sizeof(struct mr_info)) != sizeof(struct mr_info))
+        {
+            log_error("Error, Recv ibv_mr at index %lu\n", i);
+            goto error;
+        }
     }
+
+    res->mrs = mrs;
 
     return SUCCESS;
 error:
     exit(1);
 }
+
 void destroy_ib_res(struct ib_res *res)
 {
     if (res)
     {
-        free(res->qps);
+        free(res->qp_nums);
         free(res->mrs);
     }
 }
