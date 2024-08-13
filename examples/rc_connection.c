@@ -70,6 +70,7 @@ int main(int argc, char *argv[])
     socklen_t peer_addr_len = sizeof(struct sockaddr_in);
     struct ib_res remote_res;
     struct ib_res local_res;
+    init_local_ib_res(&ctx, &local_res);
     if (is_server)
     {
 
@@ -79,17 +80,18 @@ int main(int argc, char *argv[])
         peer_fd = accept(self_fd, (struct sockaddr *)&peer_addr, &peer_addr_len);
         assert(peer_fd > 0);
 
-        init_local_ib_res(&ctx, &local_res);
         send_ib_res(&local_res, peer_fd);
         recv_ib_res(&remote_res, peer_fd);
     }
     else
     {
         peer_fd = sock_create_connect(server_name, port);
-        init_local_ib_res(&ctx, &local_res);
         recv_ib_res(&remote_res, peer_fd);
         send_ib_res(&local_res, peer_fd);
     }
+
+#ifdef DEBUG
+
     printf("remote qp_nums\n");
     for (size_t i = 0; i < remote_res.qp_num; i++)
     {
@@ -100,17 +102,24 @@ int main(int argc, char *argv[])
     {
         printf("%d\n", local_res.qp_nums[i]);
     }
-    printf("remote mr len\n");
+    printf("remote mr info\n\n");
     for (size_t i = 0; i < remote_res.mr_num; i++)
     {
-        printf("%lu\n", remote_res.mrs[i].length);
+        printf("mr length %lu\n", remote_res.mrs[i].length);
+        printf("mr addrs %p\n", remote_res.mrs[i].addr);
+        printf("mr lkey %d\n", remote_res.mrs[i].lkey);
+        printf("mr rkey %d\n", remote_res.mrs[i].rkey);
     }
-    printf("local mr len\n");
+    printf("local mr len\n\n");
     for (size_t i = 0; i < ctx.qp_num; i++)
     {
-        printf("%lu\n", local_res.mrs[i].length);
+        printf("mr length %lu\n", local_res.mrs[i].length);
+        printf("mr addrs %p\n", local_res.mrs[i].addr);
+        printf("mr lkey %d\n", local_res.mrs[i].lkey);
+        printf("mr rkey %d\n", local_res.mrs[i].rkey);
     }
 
+#endif /* ifdef DEBUG */
     if (is_server)
     {
         close(self_fd);

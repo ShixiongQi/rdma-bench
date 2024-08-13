@@ -234,7 +234,7 @@ error:
 
 int send_ib_res(struct ib_res *res, int sock_fd)
 {
-    if (sock_write(sock_fd, &res, sizeof(struct ib_res)) != sizeof(struct ib_res))
+    if (sock_write(sock_fd, res, sizeof(struct ib_res)) != sizeof(struct ib_res))
     {
         log_error("Error, Send ib res\n");
         goto error;
